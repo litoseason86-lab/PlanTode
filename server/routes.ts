@@ -7,7 +7,9 @@ const DEMO_USER_ID = 1; // Fixed demo user context
 
 // Helper to log errors & respond cleanly
 function handleControllerError(res: Response, err: unknown, status = 500) {
-  console.error('API Error:', err);
+  if (status >= 500) {
+    console.error('API Error:', err);
+  }
   const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
   res.status(status).json({ status, message: msg });
 }
@@ -184,6 +186,10 @@ router.patch('/tasks/:id/status', (req: Request, res: Response) => {
 
     res.json(updated);
   } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('focus session start endpoint')) {
+      return handleControllerError(res, err, 409);
+    }
     handleControllerError(res, err);
   }
 });

@@ -359,8 +359,11 @@ export default function App() {
   const handleUpdateTaskStatus = async (id: number, status: TaskStatus) => {
     try {
       await api.updateTaskStatus(id, status);
+      if (runningSession?.taskId === id && status !== 'IN_PROGRESS') {
+        setRunningSession(null);
+      }
       showToast('进展转换完美同步');
-      loadTasksForSelectedDate();
+      await loadTasksForSelectedDate();
       
       // Update local allTasks buffer
       const all = await api.getTasks();
@@ -382,6 +385,9 @@ export default function App() {
       setRunningSession(session);
       setActiveTab('focus');
       showToast(`✨ 进入「${task.title}」深度聚焦空间`);
+      await loadTasksForSelectedDate();
+      const all = await api.getTasks();
+      setAllTasks(all);
     } catch (err: any) {
       showToast(err.message || '无法启动心流计时器', 'error');
     } finally {
@@ -407,7 +413,9 @@ export default function App() {
       setRunningSession(null);
       showToast('这一阶段的高能专注已完美记入归属分类！');
       setActiveTab('today');
-      loadTasksForSelectedDate();
+      await loadTasksForSelectedDate();
+      const all = await api.getTasks();
+      setAllTasks(all);
     } catch (err: any) {
       showToast(err.message || '终止心流阶段出现故障', 'error');
     } finally {
@@ -944,12 +952,13 @@ export default function App() {
                   {tasks.map(task => {
                     const cat = categories.find(c => c.id === task.categoryId);
                     const focusMins = getTaskFocusMinutes(task.id);
+                    const isActiveTask = runningSession?.taskId === task.id;
 
                     // node color states
                     let nodeDotClass = "bg-white border-2 border-slate-300";
                     let nodeInnerDotColor = "transparent";
 
-                    if (task.status === 'IN_PROGRESS') {
+                    if (isActiveTask) {
                       nodeDotClass = "bg-white shadow-md ring-4 ring-[var(--color-primary)]/15";
                       nodeInnerDotColor = styleContext.primary;
                     } else if (task.status === 'DONE') {
@@ -966,7 +975,7 @@ export default function App() {
                         {/* Timeline Circle Bullet Node */}
                         <div
                           className={`absolute -left-[37px] top-5 w-4 h-4 rounded-full flex items-center justify-center transition-all duration-200 ${nodeDotClass}`}
-                          style={task.status === 'IN_PROGRESS' ? { borderColor: styleContext.primary } : undefined}
+                          style={isActiveTask ? { borderColor: styleContext.primary } : undefined}
                         >
                           <div
                             className="w-1.5 h-1.5 rounded-full transition-colors"
@@ -977,7 +986,7 @@ export default function App() {
                         {/* Interactive Task Card */}
                         <div
                           className={`bg-white border-2 p-5 rounded-xl transition-all duration-200 select-none ${
-                            task.status === 'IN_PROGRESS'
+                            isActiveTask
                               ? 'border-[var(--color-primary)] shadow-md bg-[var(--color-light)]'
                               : task.status === 'DONE'
                                 ? 'border-slate-200/60 bg-slate-50/30'
@@ -1015,7 +1024,7 @@ export default function App() {
                                   </span>
                                 )}
 
-                                {task.status === 'IN_PROGRESS' && (
+                                {isActiveTask && (
                                   <span className="text-[10px] font-bold bg-[var(--color-light)] px-2 py-0.5 rounded-full animate-pulse" style={{ color: styleContext.primary }}>
                                     专注进行中
                                   </span>
@@ -1026,7 +1035,7 @@ export default function App() {
                             {/* Action buttons */}
                             <div className="flex items-center gap-1.5 opacity-90 sm:opacity-0 group-hover/card:opacity-100 transition-all duration-200 shrink-0">
 
-                              {task.status !== 'IN_PROGRESS' && task.status !== 'DONE' && (
+                              {!isActiveTask && task.status !== 'DONE' && (
                                 <button
                                   onClick={() => handleStartSession(task)}
                                   className="px-2.5 py-1.5 bg-[var(--color-primary)]/10 rounded-lg hover:bg-[var(--color-primary)]/20 transition-all text-[10px] font-bold cursor-pointer"
@@ -1037,7 +1046,7 @@ export default function App() {
                                 </button>
                               )}
 
-                              {task.status === 'IN_PROGRESS' && (
+                              {isActiveTask && (
                                 <button
                                   onClick={handleStopSession}
                                   className="px-2.5 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
@@ -1268,7 +1277,14 @@ export default function App() {
                           <div className="flex items-center gap-2 shrink-0 select-none">
                             <select
                               value={t.status}
-                              onChange={(e) => handleUpdateTaskStatus(t.id, e.target.value as any)}
+                              onChange={(e) => {
+                                const nextStatus = e.target.value as TaskStatus;
+                                if (nextStatus === 'IN_PROGRESS') {
+                                  handleStartSession(t);
+                                  return;
+                                }
+                                handleUpdateTaskStatus(t.id, nextStatus);
+                              }}
                               className="px-2 py-1 text-[10px] border border-slate-200 bg-white rounded-lg text-slate-600 font-semibold outline-none transition-colors hover:border-slate-300"
                             >
                               <option value="TODO">待执行</option>

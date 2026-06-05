@@ -144,6 +144,45 @@ class LocalDB {
     }
   }
 
+  private completeSession(session: TaskExecutionSession, endedAt: string) {
+    const duration = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(session.startedAt).getTime()) / 1000));
+    session.endedAt = endedAt;
+    session.durationSeconds = duration;
+    session.status = 'COMPLETED';
+  }
+
+  private syncTaskProgressStates(userId: number) {
+    const runningTaskIds = new Set(
+      this.data.taskExecutionSessions
+        .filter(s => s.userId === userId && s.status === 'RUNNING')
+        .map(s => s.taskId)
+    );
+
+    let changed = false;
+    const now = new Date().toISOString();
+
+    this.data.tasks.forEach(task => {
+      if (task.userId !== userId) return;
+
+      const hasRunningSession = runningTaskIds.has(task.id);
+      if (hasRunningSession && task.status !== 'IN_PROGRESS') {
+        task.status = 'IN_PROGRESS';
+        task.updatedAt = now;
+        changed = true;
+      }
+
+      if (!hasRunningSession && task.status === 'IN_PROGRESS') {
+        task.status = 'TODO';
+        task.updatedAt = now;
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      this.save();
+    }
+  }
+
   private seed() {
     const now = new Date().toISOString();
     const todayStr = now.slice(0, 10);
@@ -271,6 +310,8 @@ class LocalDB {
 
   // --- Task APIs ---
   getTasks(userId: number, dateStr?: string, status?: string, categoryId?: number): Task[] {
+    this.syncTaskProgressStates(userId);
+
     return this.data.tasks.filter(t => {
       if (t.userId !== userId) return false;
       if (dateStr && t.plannedDate !== dateStr) return false;
@@ -281,6 +322,7 @@ class LocalDB {
   }
 
   getTaskByIdAndUserId(id: number, userId: number): Task | undefined {
+    this.syncTaskProgressStates(userId);
     return this.data.tasks.find(t => t.id === id && t.userId === userId);
   }
 
@@ -303,10 +345,23 @@ class LocalDB {
   }
 
   updateTaskStatus(id: number, userId: number, status: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'NOT_DONE'): Task | undefined {
+    this.syncTaskProgressStates(userId);
+
     const task = this.getTaskByIdAndUserId(id, userId);
     if (!task) return undefined;
+    const runningSession = this.data.taskExecutionSessions.find(s => s.taskId === id && s.userId === userId && s.status === 'RUNNING');
+
+    if (status === 'IN_PROGRESS' && !runningSession) {
+      throw new Error('Use the focus session start endpoint to mark a task as in progress.');
+    }
+
+    const now = new Date().toISOString();
+    if (runningSession && status !== 'IN_PROGRESS') {
+      this.completeSession(runningSession, now);
+    }
+
     task.status = status;
-    task.updatedAt = new Date().toISOString();
+    task.updatedAt = now;
     this.save();
     return task;
   }
@@ -333,6 +388,8 @@ class LocalDB {
   }
 
   startSession(taskId: number, userId: number): TaskExecutionSession {
+    this.syncTaskProgressStates(userId);
+
     const running = this.getRunningSession(userId);
     if (running) {
       throw new Error('A focus session is already running. Please complete it first.');
@@ -375,14 +432,14 @@ class LocalDB {
     }
 
     const now = new Date().toISOString();
-    const duration = Math.max(0, Math.round((new Date(now).getTime() - new Date(session.startedAt).getTime()) / 1000));
+    this.completeSession(session, now);
 
-    session.endedAt = now;
-    session.durationSeconds = duration;
-    session.status = 'COMPLETED';
+    const task = this.getTaskByIdAndUserId(session.taskId, userId);
+    if (task && task.status === 'IN_PROGRESS') {
+      task.status = 'TODO';
+      task.updatedAt = now;
+    }
 
-    // Set task to IN_PROGRESS so user can continue focusing or mark DONE manually
-    // This maintains flexible control for the user
     this.save();
     return session;
   }
