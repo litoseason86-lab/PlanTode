@@ -29,6 +29,7 @@ import {AppHeader} from './components/AppHeader';
 import {AppToast} from './components/AppToast';
 import {GlobalRunningBar} from './components/GlobalRunningBar';
 import {getErrorMessage} from './errors';
+import {useAppData} from './hooks/useAppData';
 import {useToast} from './hooks/useToast';
 
 const PRESET_COLORS = [
@@ -51,16 +52,24 @@ const STORAGE_STYLES = {
 export default function AppShell() {
   const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [activeTheme, setActiveTheme] = useState<ThemeId>('peach');
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const {
+    categories,
+    tasks,
+    selectedDateSessions,
+    allTasks,
+    loading,
+    setLoading,
+    selectedDate,
+    setSelectedDate,
+    refreshCategories,
+    refreshAllTasks,
+    loadTasksForSelectedDate,
+    loadMetaData,
+  } = useAppData();
   const [runningSession, setRunningSession] = useState<TaskExecutionSession | null>(null);
-  const [selectedDateSessions, setSelectedDateSessions] = useState<TaskExecutionSession[]>([]);
-  const [allTasks, setAllTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(false);
   const {successMsg, errorMsg, showToast, clearSuccess, clearError} = useToast();
   const [focusTimeElapsed, setFocusTimeElapsed] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [catFormName, setCatFormName] = useState('');
@@ -94,7 +103,15 @@ export default function AppShell() {
   const styleContext = THEME_STYLES[activeTheme];
 
   useEffect(() => {
-    void loadMetaData();
+    void loadMetaData()
+      .then(({categories: loadedCategories}) => {
+        if (loadedCategories.length > 0) {
+          setTaskFormCategory((current) => current || loadedCategories[0].id);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load metadata', err);
+      });
     void checkRunningSession();
   }, []);
 
@@ -122,8 +139,10 @@ export default function AppShell() {
   }, [runningSession]);
 
   useEffect(() => {
-    void loadTasksForSelectedDate();
-  }, [selectedDate]);
+    void loadTasksForSelectedDate().catch((err) => {
+      console.error('Failed to sync date tasks', err);
+    });
+  }, [loadTasksForSelectedDate]);
 
   useEffect(() => {
     if (activeTab === 'daily') {
@@ -136,36 +155,6 @@ export default function AppShell() {
       void loadWeeklyStats();
     }
   }, [weeklyStartDate, activeTab]);
-
-  async function loadMetaData() {
-    try {
-      setLoading(true);
-      const catsData = await categoriesApi.getCategories();
-      setCategories(catsData);
-      const tasksData = await tasksApi.getTasks({date: selectedDate});
-      setTasks(tasksData);
-      const all = await tasksApi.getTasks();
-      setAllTasks(all);
-      if (catsData.length > 0 && !taskFormCategory) {
-        setTaskFormCategory(catsData[0].id);
-      }
-    } catch (err) {
-      console.error('Failed to load metadata', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadTasksForSelectedDate() {
-    try {
-      const data = await tasksApi.getTasks({date: selectedDate});
-      setTasks(data);
-      const sessionData = await focusApi.getSessions({date: selectedDate});
-      setSelectedDateSessions(sessionData);
-    } catch (err) {
-      console.error('Failed to sync date tasks', err);
-    }
-  }
 
   async function checkRunningSession() {
     try {
@@ -211,7 +200,7 @@ export default function AppShell() {
         showToast('新分类创建成功');
       }
       setIsCategoryModalOpen(false);
-      setCategories(await categoriesApi.getCategories());
+      await refreshCategories();
     } catch (err) {
       showToast(getErrorMessage(err, '操作分类失败'), 'error');
     } finally {
@@ -225,7 +214,7 @@ export default function AppShell() {
       setLoading(true);
       await categoriesApi.deleteCategory(id);
       showToast('分类已顺利移除');
-      setCategories(await categoriesApi.getCategories());
+      await refreshCategories();
     } catch (err) {
       showToast(getErrorMessage(err, '删除分类失败'), 'error');
     } finally {
@@ -250,7 +239,7 @@ export default function AppShell() {
       await tasksApi.createTask({title: taskFormTitle, categoryId: catId, plannedDate: taskFormDate});
       showToast('任务已成功下派！');
       setTaskFormTitle('');
-      setAllTasks(await tasksApi.getTasks());
+      await refreshAllTasks();
       if (taskFormDate === selectedDate) {
         void loadTasksForSelectedDate();
       }
@@ -269,7 +258,7 @@ export default function AppShell() {
       }
       showToast('进展转换完美同步');
       await loadTasksForSelectedDate();
-      setAllTasks(await tasksApi.getTasks());
+      await refreshAllTasks();
       if (activeTab === 'daily') void loadDailyStats();
       if (activeTab === 'weekly') void loadWeeklyStats();
     } catch (err) {
@@ -291,7 +280,7 @@ export default function AppShell() {
       }
       showToast('任务已删除');
       await loadTasksForSelectedDate();
-      setAllTasks(await tasksApi.getTasks());
+      await refreshAllTasks();
       if (activeTab === 'daily') void loadDailyStats();
       if (activeTab === 'weekly') void loadWeeklyStats();
     } catch (err) {
@@ -309,7 +298,7 @@ export default function AppShell() {
       setActiveTab('focus');
       showToast(`✨ 进入「${task.title}」深度聚焦空间`);
       await loadTasksForSelectedDate();
-      setAllTasks(await tasksApi.getTasks());
+      await refreshAllTasks();
     } catch (err) {
       showToast(getErrorMessage(err, '无法启动心流计时器'), 'error');
     } finally {
@@ -333,7 +322,7 @@ export default function AppShell() {
       showToast('这一阶段的高能专注已完美记入归属分类！');
       setActiveTab('today');
       await loadTasksForSelectedDate();
-      setAllTasks(await tasksApi.getTasks());
+      await refreshAllTasks();
     } catch (err) {
       showToast(getErrorMessage(err, '终止心流阶段出现故障'), 'error');
     } finally {
