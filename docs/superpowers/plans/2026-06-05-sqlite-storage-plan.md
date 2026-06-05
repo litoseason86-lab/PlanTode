@@ -145,7 +145,7 @@ afterEach(() => {
 
 describe('openSqliteClient', () => {
   it('creates schema tables and seeds demo user', () => {
-    sqliteFile = createTestSqliteFile('plantode-sqlite-client');
+    sqliteFile = createTestSqliteFile('plantodo-sqlite-client');
     const db = openSqliteClient(sqliteFile.filePath);
 
     const tables = db
@@ -174,7 +174,7 @@ describe('openSqliteClient', () => {
   });
 
   it('runs migrations idempotently', () => {
-    sqliteFile = createTestSqliteFile('plantode-sqlite-idempotent');
+    sqliteFile = createTestSqliteFile('plantodo-sqlite-idempotent');
 
     const first = openSqliteClient(sqliteFile.filePath);
     first.close();
@@ -649,7 +649,7 @@ let db: Database.Database;
 let repository: CategorySqliteRepository;
 
 beforeEach(() => {
-  sqliteFile = createTestSqliteFile('plantode-category-repository');
+  sqliteFile = createTestSqliteFile('plantodo-category-repository');
   db = openSqliteClient(sqliteFile.filePath);
   repository = new CategorySqliteRepository(db);
 });
@@ -769,7 +769,7 @@ let categories: CategorySqliteRepository;
 let tasks: TaskSqliteRepository;
 
 beforeEach(() => {
-  sqliteFile = createTestSqliteFile('plantode-task-repository');
+  sqliteFile = createTestSqliteFile('plantodo-task-repository');
   db = openSqliteClient(sqliteFile.filePath);
   categories = new CategorySqliteRepository(db);
   tasks = new TaskSqliteRepository(db);
@@ -923,7 +923,7 @@ let tasks: TaskSqliteRepository;
 let sessions: FocusSessionSqliteRepository;
 
 beforeEach(() => {
-  sqliteFile = createTestSqliteFile('plantode-focus-repository');
+  sqliteFile = createTestSqliteFile('plantodo-focus-repository');
   db = openSqliteClient(sqliteFile.filePath);
   categories = new CategorySqliteRepository(db);
   tasks = new TaskSqliteRepository(db);
@@ -1055,7 +1055,7 @@ let db: Database.Database;
 let reports: ReportSqliteRepository;
 
 beforeEach(() => {
-  sqliteFile = createTestSqliteFile('plantode-report-repository');
+  sqliteFile = createTestSqliteFile('plantodo-report-repository');
   db = openSqliteClient(sqliteFile.filePath);
   reports = new ReportSqliteRepository(db);
 });
@@ -1201,7 +1201,7 @@ afterEach(() => {
 
 describe('createRepositoriesFromEnv', () => {
   it('defaults to json repositories', () => {
-    jsonFile = createTestSqliteFile('plantode-json-factory');
+    jsonFile = createTestSqliteFile('plantodo-json-factory');
     vi.stubEnv('JSON_DB_PATH', jsonFile.filePath);
 
     const repositories = createRepositoriesFromEnv();
@@ -1213,7 +1213,7 @@ describe('createRepositoriesFromEnv', () => {
   });
 
   it('creates sqlite repositories when STORAGE_DRIVER is sqlite', () => {
-    sqliteFile = createTestSqliteFile('plantode-repository-factory');
+    sqliteFile = createTestSqliteFile('plantodo-repository-factory');
     vi.stubEnv('STORAGE_DRIVER', 'sqlite');
     vi.stubEnv('SQLITE_DB_PATH', sqliteFile.filePath);
 
@@ -1286,7 +1286,7 @@ export function createRepositoriesFromEnv(env: NodeJS.ProcessEnv = process.env):
   }
 
   if (driver === 'sqlite') {
-    const db = openSqliteClient(path.resolve(env.SQLITE_DB_PATH ?? 'data/plantode.sqlite'));
+    const db = openSqliteClient(path.resolve(env.SQLITE_DB_PATH ?? 'data/plantodo.sqlite'));
     return {
       categories: new CategorySqliteRepository(db),
       tasks: new TaskSqliteRepository(db),
@@ -1345,7 +1345,7 @@ Modify `.env.example`:
 
 ```txt
 STORAGE_DRIVER=sqlite
-SQLITE_DB_PATH=data/plantode.sqlite
+SQLITE_DB_PATH=data/plantodo.sqlite
 JSON_DB_PATH=data/db.json
 ```
 
@@ -1387,7 +1387,7 @@ Modify `README.md` to include:
 
 ```bash
 STORAGE_DRIVER=sqlite
-SQLITE_DB_PATH=data/plantode.sqlite
+SQLITE_DB_PATH=data/plantodo.sqlite
 ```
 
 也可以切换到 JSON：
@@ -1436,7 +1436,7 @@ Expected: PASS。
 Run server:
 
 ```bash
-STORAGE_DRIVER=sqlite SQLITE_DB_PATH=data/test-plantode.sqlite npm run dev
+STORAGE_DRIVER=sqlite SQLITE_DB_PATH=data/test-plantodo.sqlite npm run dev
 ```
 
 In another shell:
@@ -1462,7 +1462,7 @@ Stop the dev server after verification.
 Run:
 
 ```bash
-rm -f data/test-plantode.sqlite
+rm -f data/test-plantodo.sqlite
 ```
 
 Expected: no generated SQLite test database remains in the worktree.

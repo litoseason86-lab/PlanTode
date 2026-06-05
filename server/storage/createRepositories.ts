@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 import type {CategoryRepository} from '../modules/categories/repository';
@@ -22,6 +23,20 @@ export interface AppRepositories {
   reports: ReportRepository;
 }
 
+const CANONICAL_SQLITE_DB_PATH = 'data/plantodo.sqlite';
+const LEGACY_SQLITE_DB_PATH = 'data/plantode.sqlite';
+
+function resolveDefaultSqlitePath(): string {
+  const canonicalPath = path.resolve(CANONICAL_SQLITE_DB_PATH);
+  const legacyPath = path.resolve(LEGACY_SQLITE_DB_PATH);
+
+  if (!fs.existsSync(canonicalPath) && fs.existsSync(legacyPath)) {
+    return legacyPath;
+  }
+
+  return canonicalPath;
+}
+
 export function createRepositoriesFromEnv(env: NodeJS.ProcessEnv = process.env): AppRepositories {
   const driver = env.STORAGE_DRIVER ?? 'sqlite';
 
@@ -36,7 +51,8 @@ export function createRepositoriesFromEnv(env: NodeJS.ProcessEnv = process.env):
   }
 
   if (driver === 'sqlite') {
-    const db = openSqliteClient(path.resolve(env.SQLITE_DB_PATH ?? 'data/plantode.sqlite'));
+    const sqlitePath = env.SQLITE_DB_PATH ? path.resolve(env.SQLITE_DB_PATH) : resolveDefaultSqlitePath();
+    const db = openSqliteClient(sqlitePath);
     return {
       categories: new CategorySqliteRepository(db),
       tasks: new TaskSqliteRepository(db),

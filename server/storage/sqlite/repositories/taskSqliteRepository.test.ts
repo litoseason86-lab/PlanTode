@@ -12,7 +12,7 @@ let categories: CategorySqliteRepository;
 let tasks: TaskSqliteRepository;
 
 beforeEach(() => {
-  sqliteFile = createTestSqliteFile('plantode-task-repository');
+  sqliteFile = createTestSqliteFile('plantodo-task-repository');
   db = openSqliteClient(sqliteFile.filePath);
   categories = new CategorySqliteRepository(db);
   tasks = new TaskSqliteRepository(db);

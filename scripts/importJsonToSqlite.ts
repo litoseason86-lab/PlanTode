@@ -244,7 +244,7 @@ export function importJsonToSqlite({jsonPath, sqlitePath, force = false}: Import
 function parseCliArgs(argv: string[]) {
   const options = {
     jsonPath: 'data/db.json',
-    sqlitePath: 'data/plantode.sqlite',
+    sqlitePath: 'data/plantodo.sqlite',
     force: false,
   };
 

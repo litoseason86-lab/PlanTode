@@ -13,7 +13,7 @@ const createdPaths: string[] = [];
 function createTempFilePath(): string {
   const filePath = path.join(
     os.tmpdir(),
-    `plantode-focus-repository-${Date.now()}-${Math.random().toString(16).slice(2)}.json`,
+    `plantodo-focus-repository-${Date.now()}-${Math.random().toString(16).slice(2)}.json`,
   );
   createdPaths.push(filePath);
   return filePath;

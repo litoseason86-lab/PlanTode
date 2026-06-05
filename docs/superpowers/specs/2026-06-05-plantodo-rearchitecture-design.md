@@ -1,8 +1,8 @@
-# PlanTode 单用户本地工具重构设计
+# PlanTodo 单用户本地工具重构设计
 
 ## 背景
 
-当前 `PlanTode` 已具备基础可用性，但整体结构仍停留在原型阶段：
+当前 `PlanTodo` 已具备基础可用性，但整体结构仍停留在原型阶段：
 
 - 前端大量页面状态、业务判断、统计转换和交互流程集中在 `src/App.tsx`
 - 后端的路由控制、业务规则、存储读写集中在 `server/routes.ts`、`server/db.ts`、`server/reports.ts`

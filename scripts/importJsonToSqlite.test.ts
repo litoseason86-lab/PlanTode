@@ -23,11 +23,11 @@ afterEach(() => {
 });
 
 function createTestFiles(): TestFiles {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'plantode-json-import-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'plantodo-json-import-'));
   files = {
     directory,
     jsonPath: path.join(directory, 'db.json'),
-    sqlitePath: path.join(directory, 'plantode.sqlite'),
+    sqlitePath: path.join(directory, 'plantodo.sqlite'),
   };
   return files;
 }

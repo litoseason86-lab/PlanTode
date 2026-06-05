@@ -1,8 +1,8 @@
-# PlanTode 单用户本地工具重构 Implementation Plan
+# PlanTodo 单用户本地工具重构 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在不丢失现有页面与功能的前提下，把 `PlanTode` 从单文件原型重构为按业务域组织、具备存储抽象和可验证边界的本地单用户工具。
+**Goal:** 在不丢失现有页面与功能的前提下，把 `PlanTodo` 从单文件原型重构为按业务域组织、具备存储抽象和可验证边界的本地单用户工具。
 
 **Architecture:** 先建立共享领域模型与测试护栏，再把后端拆为 `route -> service -> repository contract -> json storage`，随后把前端拆为 `app -> modules -> shared`。保留 `data/db.json` 作为当前存储实现，但所有业务规则从文件存储中抽离。
 
@@ -309,7 +309,7 @@ import {TaskJsonRepository} from '../../storage/json/repositories/taskJsonReposi
 
 describe('TaskJsonRepository', () => {
   it('filters tasks by user, date and category', () => {
-    const store = new JsonFileStore('/tmp/plantode-task-repo-test.json');
+    const store = new JsonFileStore('/tmp/plantodo-task-repo-test.json');
     store.write({
       users: [],
       categories: [],
@@ -1111,7 +1111,7 @@ Expected: 当前阶段至少有一项失败，因为旧入口尚未彻底切断
 - [ ] **Step 2: 删除旧文件并更新 README**
 
 ```md
-# PlanTode
+# PlanTodo
 
 本项目是一个本地单用户计划管理工具，采用 React + Express + JSON 存储。
 
@@ -1175,7 +1175,7 @@ git commit -m "refactor: remove legacy monolith entrypoints"
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-05-plantode-rearchitecture-plan.md`. Two execution options:
+Plan complete and saved to `docs/superpowers/plans/2026-06-05-plantodo-rearchitecture-plan.md`. Two execution options:
 
 **1. Subagent-Driven (recommended)** - I dispatch a fresh subagent per task, review between tasks, fast iteration
 

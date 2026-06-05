@@ -12,7 +12,7 @@ afterEach(() => {
 
 describe('openSqliteClient', () => {
   it('creates schema tables and seeds demo user', () => {
-    sqliteFile = createTestSqliteFile('plantode-sqlite-client');
+    sqliteFile = createTestSqliteFile('plantodo-sqlite-client');
     const db = openSqliteClient(sqliteFile.filePath);
 
     const tables = db
@@ -41,7 +41,7 @@ describe('openSqliteClient', () => {
   });
 
   it('runs migrations idempotently', () => {
-    sqliteFile = createTestSqliteFile('plantode-sqlite-idempotent');
+    sqliteFile = createTestSqliteFile('plantodo-sqlite-idempotent');
 
     const first = openSqliteClient(sqliteFile.filePath);
     first.close();

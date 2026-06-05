@@ -14,7 +14,7 @@ let tasks: TaskSqliteRepository;
 let sessions: FocusSessionSqliteRepository;
 
 beforeEach(() => {
-  sqliteFile = createTestSqliteFile('plantode-focus-repository');
+  sqliteFile = createTestSqliteFile('plantodo-focus-repository');
   db = openSqliteClient(sqliteFile.filePath);
   categories = new CategorySqliteRepository(db);
   tasks = new TaskSqliteRepository(db);

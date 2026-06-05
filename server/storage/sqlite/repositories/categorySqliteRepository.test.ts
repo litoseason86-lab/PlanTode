@@ -10,7 +10,7 @@ let db: Database.Database;
 let repository: CategorySqliteRepository;
 
 beforeEach(() => {
-  sqliteFile = createTestSqliteFile('plantode-category-repository');
+  sqliteFile = createTestSqliteFile('plantodo-category-repository');
   db = openSqliteClient(sqliteFile.filePath);
   repository = new CategorySqliteRepository(db);
 });

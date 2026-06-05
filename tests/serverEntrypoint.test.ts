@@ -14,7 +14,7 @@ describe('server entrypoint', () => {
       env: {
         ...process.env,
         NODE_ENV: 'production',
-        SQLITE_DB_PATH: '/dev/null/plantode.sqlite',
+        SQLITE_DB_PATH: '/dev/null/plantodo.sqlite',
         STORAGE_DRIVER: 'sqlite',
       },
       timeout: 5000,

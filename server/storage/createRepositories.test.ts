@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {createRepositoriesFromEnv} from './createRepositories';
@@ -5,18 +9,35 @@ import {createTestSqliteFile, type TestSqliteFile} from './sqlite/testSqlite';
 
 let sqliteFile: TestSqliteFile | undefined;
 let jsonFile: TestSqliteFile | undefined;
+let projectDirectory: string | undefined;
+const originalCwd = process.cwd();
+
+function useTemporaryProjectDirectory(): {canonicalSqlitePath: string; legacySqlitePath: string} {
+  projectDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'plantodo-project-'));
+  process.chdir(projectDirectory);
+
+  return {
+    canonicalSqlitePath: path.join(projectDirectory, 'data', 'plantodo.sqlite'),
+    legacySqlitePath: path.join(projectDirectory, 'data', 'plantode.sqlite'),
+  };
+}
 
 afterEach(() => {
+  process.chdir(originalCwd);
   sqliteFile?.cleanup();
   jsonFile?.cleanup();
+  if (projectDirectory) {
+    fs.rmSync(projectDirectory, {recursive: true, force: true});
+  }
   sqliteFile = undefined;
   jsonFile = undefined;
+  projectDirectory = undefined;
   vi.unstubAllEnvs();
 });
 
 describe('createRepositoriesFromEnv', () => {
   it('defaults to sqlite repositories', () => {
-    sqliteFile = createTestSqliteFile('plantode-default-sqlite-factory');
+    sqliteFile = createTestSqliteFile('plantodo-default-sqlite-factory');
     vi.stubEnv('SQLITE_DB_PATH', sqliteFile.filePath);
 
     const repositories = createRepositoriesFromEnv();
@@ -28,7 +49,7 @@ describe('createRepositoriesFromEnv', () => {
   });
 
   it('creates sqlite repositories when STORAGE_DRIVER is sqlite', () => {
-    sqliteFile = createTestSqliteFile('plantode-repository-factory');
+    sqliteFile = createTestSqliteFile('plantodo-repository-factory');
     vi.stubEnv('STORAGE_DRIVER', 'sqlite');
     vi.stubEnv('SQLITE_DB_PATH', sqliteFile.filePath);
 
@@ -40,8 +61,28 @@ describe('createRepositoriesFromEnv', () => {
     expect(repositories.reports.constructor.name).toBe('ReportSqliteRepository');
   });
 
+  it('uses plantodo.sqlite as the canonical default sqlite database', () => {
+    const {canonicalSqlitePath, legacySqlitePath} = useTemporaryProjectDirectory();
+
+    createRepositoriesFromEnv({STORAGE_DRIVER: 'sqlite'});
+
+    expect(fs.existsSync(canonicalSqlitePath)).toBe(true);
+    expect(fs.existsSync(legacySqlitePath)).toBe(false);
+  });
+
+  it('keeps using a legacy plantode.sqlite database when it is the only default database present', () => {
+    const {canonicalSqlitePath, legacySqlitePath} = useTemporaryProjectDirectory();
+    fs.mkdirSync(path.dirname(legacySqlitePath), {recursive: true});
+    fs.writeFileSync(legacySqlitePath, '');
+
+    createRepositoriesFromEnv({STORAGE_DRIVER: 'sqlite'});
+
+    expect(fs.existsSync(legacySqlitePath)).toBe(true);
+    expect(fs.existsSync(canonicalSqlitePath)).toBe(false);
+  });
+
   it('creates json repositories when STORAGE_DRIVER is json', () => {
-    jsonFile = createTestSqliteFile('plantode-json-factory');
+    jsonFile = createTestSqliteFile('plantodo-json-factory');
     vi.stubEnv('STORAGE_DRIVER', 'json');
     vi.stubEnv('JSON_DB_PATH', jsonFile.filePath);
 

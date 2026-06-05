@@ -10,7 +10,7 @@ let db: Database.Database;
 let reports: ReportSqliteRepository;
 
 beforeEach(() => {
-  sqliteFile = createTestSqliteFile('plantode-report-repository');
+  sqliteFile = createTestSqliteFile('plantodo-report-repository');
   db = openSqliteClient(sqliteFile.filePath);
   reports = new ReportSqliteRepository(db);
 });
