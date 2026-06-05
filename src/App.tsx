@@ -24,7 +24,6 @@ import {
   ChevronRight,
   TrendingDown
 } from 'lucide-react';
-import { api, Category, Task, TaskExecutionSession, TaskStatus } from './api';
 import {
   ResponsiveContainer,
   BarChart,
@@ -39,36 +38,13 @@ import {
   Pie,
   Legend
 } from 'recharts';
-
-// Curated soft theme colors for theme selector
-const THEME_STYLES = {
-  peach: {
-    id: 'peach' as const,
-    name: '桃色暖光',
-    primary: '#fb7185',
-    secondary: '#fda4af',
-    bg: '#fff5f5',
-    light: '#fff1f2',
-    accentText: 'text-rose-600',
-    border: 'border-rose-200',
-    primaryBg: 'bg-rose-500',
-    primaryHoverBg: 'hover:bg-rose-600',
-    primaryLight: '#fff1f2',
-  },
-  beige: {
-    id: 'beige' as const,
-    name: '经典优雅米',
-    primary: '#d4a574',
-    secondary: '#e7c29f',
-    bg: '#fafaf9',
-    light: '#fdfaf6',
-    accentText: 'text-[#a0744a]',
-    border: 'border-amber-200/60',
-    primaryBg: 'bg-[#d4a574]',
-    primaryHoverBg: 'hover:bg-[#c29260]',
-    primaryLight: '#fdfaf6',
-  }
-};
+import type {Category, Task, TaskExecutionSession} from '../shared/domain/entities';
+import type {TaskStatus} from '../shared/domain/status';
+import {APP_TABS, type AppTab} from './app/navigation';
+import {THEME_STYLES, type ThemeId} from './app/theme';
+import {categoriesApi} from './modules/categories/api/categoriesApi';
+import {tasksApi} from './modules/tasks/api/tasksApi';
+import {focusApi} from './modules/focus/api/focusApi';
 
 const PRESET_COLORS = [
   { hex: '#fb7185', label: '樱花粉' },
@@ -82,8 +58,8 @@ const PRESET_COLORS = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'today' | 'tasks' | 'categories' | 'daily' | 'weekly' | 'focus'>('today');
-  const [activeTheme, setActiveTheme] = useState<'peach' | 'beige'>('peach');
+  const [activeTab, setActiveTab] = useState<AppTab>('today');
+  const [activeTheme, setActiveTheme] = useState<ThemeId>('peach');
   
   // Data State
   const [categories, setCategories] = useState<Category[]>([]);
@@ -204,13 +180,13 @@ export default function App() {
   const loadMetaData = async () => {
     try {
       setLoading(true);
-      const catsData = await api.getCategories();
+      const catsData = await categoriesApi.getCategories();
       setCategories(catsData);
       
-      const tasksData = await api.getTasks({ date: selectedDate });
+      const tasksData = await tasksApi.getTasks({ date: selectedDate });
       setTasks(tasksData);
 
-      const all = await api.getTasks();
+      const all = await tasksApi.getTasks();
       setAllTasks(all);
 
       if (catsData.length > 0 && !taskFormCategory) {
@@ -225,9 +201,9 @@ export default function App() {
 
   const loadTasksForSelectedDate = async () => {
     try {
-      const data = await api.getTasks({ date: selectedDate });
+      const data = await tasksApi.getTasks({ date: selectedDate });
       setTasks(data);
-      const sessionData = await api.getSessions({ date: selectedDate });
+      const sessionData = await focusApi.getSessions({ date: selectedDate });
       setSelectedDateSessions(sessionData);
     } catch (err) {
       console.error('Failed to sync date tasks', err);
@@ -236,7 +212,7 @@ export default function App() {
 
   const checkRunningSession = async () => {
     try {
-      const res = await api.getRunningSession();
+      const res = await focusApi.getRunningSession();
       if (res.session) {
         setRunningSession(res.session);
         setActiveTab('focus');
@@ -281,14 +257,14 @@ export default function App() {
     try {
       setLoading(true);
       if (editingCategory) {
-        await api.updateCategory(editingCategory.id, {
+        await categoriesApi.updateCategory(editingCategory.id, {
           name: catFormName,
           color: catFormColor,
           sortOrder: catFormSort
         });
         showToast('分类更新完成');
       } else {
-        await api.createCategory({
+        await categoriesApi.createCategory({
           name: catFormName,
           color: catFormColor,
           sortOrder: catFormSort
@@ -296,7 +272,7 @@ export default function App() {
         showToast('新分类创建成功');
       }
       setIsCategoryModalOpen(false);
-      const list = await api.getCategories();
+      const list = await categoriesApi.getCategories();
       setCategories(list);
     } catch (err: any) {
       showToast(err.message || '操作分类失败', 'error');
@@ -309,9 +285,9 @@ export default function App() {
     if (!window.confirm('您确定要删去该分类？关联任务将变为无分类状态。')) return;
     try {
       setLoading(true);
-      await api.deleteCategory(id);
+      await categoriesApi.deleteCategory(id);
       showToast('分类已顺利移除');
-      const list = await api.getCategories();
+      const list = await categoriesApi.getCategories();
       setCategories(list);
     } catch (err: any) {
       showToast(err.message || '删除分类失败', 'error');
@@ -335,7 +311,7 @@ export default function App() {
 
     try {
       setLoading(true);
-      await api.createTask({
+      await tasksApi.createTask({
         title: taskFormTitle,
         categoryId: catId,
         plannedDate: taskFormDate
@@ -343,7 +319,7 @@ export default function App() {
       showToast('任务已成功下派！');
       setTaskFormTitle('');
       
-      const all = await api.getTasks();
+      const all = await tasksApi.getTasks();
       setAllTasks(all);
 
       if (taskFormDate === selectedDate) {
@@ -358,7 +334,7 @@ export default function App() {
 
   const handleUpdateTaskStatus = async (id: number, status: TaskStatus) => {
     try {
-      await api.updateTaskStatus(id, status);
+      await tasksApi.updateTaskStatus(id, status);
       if (runningSession?.taskId === id && status !== 'IN_PROGRESS') {
         setRunningSession(null);
       }
@@ -366,7 +342,7 @@ export default function App() {
       await loadTasksForSelectedDate();
       
       // Update local allTasks buffer
-      const all = await api.getTasks();
+      const all = await tasksApi.getTasks();
       setAllTasks(all);
 
       // Re-trigger daily / weekly stats if they correspond
@@ -381,12 +357,12 @@ export default function App() {
   const handleStartSession = async (task: Task) => {
     try {
       setLoading(true);
-      const session = await api.startSession(task.id);
+      const session = await focusApi.startSession(task.id);
       setRunningSession(session);
       setActiveTab('focus');
       showToast(`✨ 进入「${task.title}」深度聚焦空间`);
       await loadTasksForSelectedDate();
-      const all = await api.getTasks();
+      const all = await tasksApi.getTasks();
       setAllTasks(all);
     } catch (err: any) {
       showToast(err.message || '无法启动心流计时器', 'error');
@@ -399,7 +375,7 @@ export default function App() {
     if (!runningSession) return;
     try {
       setLoading(true);
-      const stopped = await api.stopSession(runningSession.id);
+      const stopped = await focusApi.stopSession(runningSession.id);
       
       // Try to find native task
       let originTask = tasks.find(t => t.id === stopped.taskId);
@@ -414,7 +390,7 @@ export default function App() {
       showToast('这一阶段的高能专注已完美记入归属分类！');
       setActiveTab('today');
       await loadTasksForSelectedDate();
-      const all = await api.getTasks();
+      const all = await tasksApi.getTasks();
       setAllTasks(all);
     } catch (err: any) {
       showToast(err.message || '终止心流阶段出现故障', 'error');
@@ -427,17 +403,17 @@ export default function App() {
   const loadDailyStats = async () => {
     setDailyStatsLoaded(false);
     try {
-      const tList = await api.getTasks({ date: dailyReportDate });
+      const tList = await tasksApi.getTasks({ date: dailyReportDate });
       setDailyTasks(tList);
 
-      const sList = await api.getSessions({ date: dailyReportDate });
+      const sList = await focusApi.getSessions({ date: dailyReportDate });
       setDailySessions(sList);
 
       // Fetch yesterday comparison
       const yesterday = new Date(dailyReportDate);
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().slice(0, 10);
-      const sPrevList = await api.getSessions({ date: yesterdayStr });
+      const sPrevList = await focusApi.getSessions({ date: yesterdayStr });
       setPrevDailySessions(sPrevList);
 
       setDailyStatsLoaded(true);
@@ -457,8 +433,8 @@ export default function App() {
       });
 
       const dayLoads = await Promise.all(days.map(async (day) => {
-        const tList = await api.getTasks({ date: day });
-        const sList = await api.getSessions({ date: day });
+        const tList = await tasksApi.getTasks({ date: day });
+        const sList = await focusApi.getSessions({ date: day });
         return { day, tasks: tList, sessions: sList };
       }));
 
@@ -706,13 +682,18 @@ export default function App() {
 
           {/* Horizontal Navigation Tabs */}
           <nav className="flex items-center gap-1 bg-white/60 backdrop-blur-sm rounded-2xl p-1.5 border border-slate-200/40 shadow-sm" id="horizontal_navigation_menu">
-            {[
-              { key: 'today' as const, icon: LayoutDashboard, label: '今日执行' },
-              { key: 'tasks' as const, icon: ListTodo, label: '任务库' },
-              { key: 'categories' as const, icon: Tags, label: '分类管理' },
-              { key: 'daily' as const, icon: FileText, label: '每日记录' },
-              { key: 'weekly' as const, icon: CalendarRange, label: '周复盘' },
-            ].map(tab => (
+            {APP_TABS.filter((tab) => tab.key !== 'focus').map((tab) => {
+              const iconMap = {
+                today: LayoutDashboard,
+                tasks: ListTodo,
+                categories: Tags,
+                daily: FileText,
+                weekly: CalendarRange,
+                focus: Timer,
+              } as const;
+              const Icon = iconMap[tab.key];
+
+              return (
               <button
                 key={tab.key}
                 onClick={() => { setActiveTab(tab.key); setErrorMsg(null); }}
@@ -723,10 +704,11 @@ export default function App() {
                 }`}
                 style={activeTab === tab.key ? { backgroundColor: styleContext.primary } : undefined}
               >
-                <tab.icon className="w-3.5 h-3.5" />
+                <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
               </button>
-            ))}
+              );
+            })}
 
             {runningSession && (
               <button
