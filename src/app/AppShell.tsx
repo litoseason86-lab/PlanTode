@@ -1,19 +1,18 @@
-import {useEffect, useMemo, useRef, useState, type FormEvent} from 'react';
+import {useEffect, useMemo, useState, type FormEvent} from 'react';
 import {
   Calendar,
   Loader2,
   Square,
 } from 'lucide-react';
 
-import type {Category, Task, TaskExecutionSession} from '../../shared/domain/entities';
+import type {Task} from '../../shared/domain/entities';
 import type {TaskStatus} from '../../shared/domain/status';
 import {CategoryPanel} from '../modules/categories/components/CategoryPanel';
 import {useCategoryActions} from '../modules/categories/controllers/useCategoryActions';
 import {DashboardPanel} from '../modules/dashboard/components/DashboardPanel';
 import {buildTodayCategoryFocusData, getTaskFocusMinutes} from '../modules/dashboard/controllers/useDashboardController';
-import {focusApi} from '../modules/focus/api/focusApi';
 import {FocusPanel} from '../modules/focus/components/FocusPanel';
-import {formatFocusElapsed, calculateFocusRingOffset} from '../modules/focus/controllers/useFocusController';
+import {useFocusSessionController} from '../modules/focus/controllers/useFocusSessionController';
 import {DailyReportPanel} from '../modules/reports/components/DailyReportPanel';
 import {useReportStatsController} from '../modules/reports/controllers/useReportStatsController';
 import {WeeklyReviewPanel} from '../modules/reports/components/WeeklyReviewPanel';
@@ -22,7 +21,6 @@ import {THEME_STYLES, type ThemeId} from './theme';
 import {tasksApi} from '../modules/tasks/api/tasksApi';
 import {filterTasks} from '../modules/tasks/controllers/useTasksController';
 import {TasksPanel} from '../modules/tasks/components/TasksPanel';
-import {calculateEffectiveFocusSeconds} from '../modules/focus/controllers/useFocusController';
 import {AppHeader} from './components/AppHeader';
 import {AppToast} from './components/AppToast';
 import {GlobalRunningBar} from './components/GlobalRunningBar';
@@ -64,20 +62,25 @@ export default function AppShell() {
     loadTasksForSelectedDate,
     loadMetaData,
   } = useAppData();
-  const [runningSession, setRunningSession] = useState<TaskExecutionSession | null>(null);
   const {successMsg, errorMsg, showToast, clearSuccess, clearError} = useToast();
-  const [focusTimeElapsed, setFocusTimeElapsed] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [taskFormTitle, setTaskFormTitle] = useState('');
   const [taskFormCategory, setTaskFormCategory] = useState(0);
   const [taskFormDate, setTaskFormDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [taskFilterCategory, setTaskFilterCategory] = useState('all');
   const [taskFilterStatus, setTaskFilterStatus] = useState('all');
   const [taskFilterDateScope, setTaskFilterDateScope] = useState<'today' | 'seven-days' | 'all'>('today');
-  const [lastFinishedSessionTask, setLastFinishedSessionTask] = useState<Task | null>(null);
 
   const styleContext = THEME_STYLES[activeTheme];
   const reportStats = useReportStatsController({categories, allTasks});
+  const focusSession = useFocusSessionController({
+    tasks,
+    allTasks,
+    setActiveTab,
+    setLoading,
+    showToast,
+    loadTasksForSelectedDate,
+    refreshAllTasks,
+  });
   const categoryActions = useCategoryActions({
     categories,
     refreshCategories,
@@ -95,31 +98,8 @@ export default function AppShell() {
       .catch((err) => {
         console.error('Failed to load metadata', err);
       });
-    void checkRunningSession();
+    void focusSession.checkRunningSession();
   }, []);
-
-  useEffect(() => {
-    if (runningSession) {
-      const calculateDiff = () => calculateEffectiveFocusSeconds(runningSession);
-      setFocusTimeElapsed(calculateDiff());
-      if (runningSession.status === 'PAUSED') {
-        return undefined;
-      }
-      timerRef.current = setInterval(() => setFocusTimeElapsed(calculateDiff()), 1000);
-      return () => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-      };
-    }
-
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setFocusTimeElapsed(0);
-    return undefined;
-  }, [runningSession]);
 
   useEffect(() => {
     void loadTasksForSelectedDate().catch((err) => {
@@ -138,20 +118,6 @@ export default function AppShell() {
       void reportStats.loadWeeklyStats();
     }
   }, [reportStats.weeklyStartDate, activeTab, reportStats.loadWeeklyStats]);
-
-  async function checkRunningSession() {
-    try {
-      const res = await focusApi.getRunningSession();
-      if (res.session) {
-        setRunningSession(res.session);
-        setActiveTab('focus');
-      } else {
-        setRunningSession(null);
-      }
-    } catch (err) {
-      console.error('Check session state error', err);
-    }
-  }
 
   async function handleCreateTask(event?: FormEvent) {
     if (event) event.preventDefault();
@@ -184,8 +150,8 @@ export default function AppShell() {
   async function handleUpdateTaskStatus(id: number, status: TaskStatus) {
     try {
       await tasksApi.updateTaskStatus(id, status);
-      if (runningSession?.taskId === id && status !== 'IN_PROGRESS') {
-        setRunningSession(null);
+      if (focusSession.runningSession?.taskId === id && status !== 'IN_PROGRESS') {
+        focusSession.setRunningSession(null);
       }
       showToast('进展转换完美同步');
       await loadTasksForSelectedDate();
@@ -203,11 +169,11 @@ export default function AppShell() {
     try {
       setLoading(true);
       await tasksApi.deleteTask(task.id);
-      if (runningSession?.taskId === task.id) {
-        setRunningSession(null);
+      if (focusSession.runningSession?.taskId === task.id) {
+        focusSession.setRunningSession(null);
       }
-      if (lastFinishedSessionTask?.id === task.id) {
-        setLastFinishedSessionTask(null);
+      if (focusSession.lastFinishedSessionTask?.id === task.id) {
+        focusSession.setLastFinishedSessionTask(null);
       }
       showToast('任务已删除');
       await loadTasksForSelectedDate();
@@ -216,76 +182,6 @@ export default function AppShell() {
       if (activeTab === 'weekly') void reportStats.loadWeeklyStats();
     } catch (err) {
       showToast(getErrorMessage(err, '删除任务失败'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleStartSession(task: Task) {
-    try {
-      setLoading(true);
-      const session = await focusApi.startSession(task.id);
-      setRunningSession(session);
-      setActiveTab('focus');
-      showToast(`✨ 进入「${task.title}」深度聚焦空间`);
-      await loadTasksForSelectedDate();
-      await refreshAllTasks();
-    } catch (err) {
-      showToast(getErrorMessage(err, '无法启动心流计时器'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleStopSession() {
-    if (!runningSession) return;
-    try {
-      setLoading(true);
-      const stopped = await focusApi.stopSession(runningSession.id);
-      let originTask = tasks.find((task) => task.id === stopped.taskId);
-      if (!originTask) {
-        originTask = allTasks.find((task) => task.id === stopped.taskId);
-      }
-      if (originTask) {
-        setLastFinishedSessionTask(originTask);
-      }
-      setRunningSession(null);
-      showToast('这一阶段的高能专注已完美记入归属分类！');
-      setActiveTab('today');
-      await loadTasksForSelectedDate();
-      await refreshAllTasks();
-    } catch (err) {
-      showToast(getErrorMessage(err, '终止心流阶段出现故障'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handlePauseSession() {
-    if (!runningSession) return;
-    try {
-      setLoading(true);
-      const paused = await focusApi.pauseSession(runningSession.id);
-      setRunningSession(paused);
-      setFocusTimeElapsed(calculateEffectiveFocusSeconds(paused));
-      showToast('专注已暂停，暂停时间不会计入统计');
-    } catch (err) {
-      showToast(getErrorMessage(err, '暂停专注失败'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleResumeSession() {
-    if (!runningSession) return;
-    try {
-      setLoading(true);
-      const resumed = await focusApi.resumeSession(runningSession.id);
-      setRunningSession(resumed);
-      setFocusTimeElapsed(calculateEffectiveFocusSeconds(resumed));
-      showToast('继续专注');
-    } catch (err) {
-      showToast(getErrorMessage(err, '继续专注失败'), 'error');
     } finally {
       setLoading(false);
     }
@@ -306,16 +202,12 @@ export default function AppShell() {
     [allTasks, taskFilterCategory, taskFilterStatus, taskFilterDateScope, selectedDate],
   );
 
-  const focusController = {
-    formattedElapsed: formatFocusElapsed(focusTimeElapsed),
-    progressOffset: calculateFocusRingOffset(focusTimeElapsed),
-  };
   const getTaskFocusMinutesForPanel = (taskId: number) =>
     getTaskFocusMinutes({
       taskId,
       selectedDateSessions,
-      runningSession,
-      focusTimeElapsed,
+      runningSession: focusSession.runningSession,
+      focusTimeElapsed: focusSession.focusTimeElapsed,
     });
 
   return (
@@ -342,10 +234,10 @@ export default function AppShell() {
         clearError={clearError}
       />
 
-      {runningSession && activeTab !== 'focus' && (
+      {focusSession.runningSession && activeTab !== 'focus' && (
         <GlobalRunningBar
-          runningSession={runningSession}
-          focusTimeElapsed={focusTimeElapsed}
+          runningSession={focusSession.runningSession}
+          focusTimeElapsed={focusSession.focusTimeElapsed}
           onOpenFocus={() => setActiveTab('focus')}
         />
       )}
@@ -353,8 +245,8 @@ export default function AppShell() {
       <AppHeader
         activeTab={activeTab}
         activeTheme={activeTheme}
-        hasRunningSession={Boolean(runningSession)}
-        runningSessionStatus={runningSession?.status}
+        hasRunningSession={Boolean(focusSession.runningSession)}
+        runningSessionStatus={focusSession.runningSession?.status}
         primaryColor={styleContext.primary}
         setActiveTab={setActiveTab}
         setActiveTheme={setActiveTheme}
@@ -376,11 +268,11 @@ export default function AppShell() {
             setTaskFormCategory={setTaskFormCategory}
             handleCreateTask={handleCreateTask}
             handleUpdateTaskStatus={handleUpdateTaskStatus}
-            handleStartSession={handleStartSession}
-            handleStopSession={handleStopSession}
-            runningSession={runningSession}
-            lastFinishedSessionTask={lastFinishedSessionTask}
-            setLastFinishedSessionTask={setLastFinishedSessionTask}
+            handleStartSession={focusSession.handleStartSession}
+            handleStopSession={focusSession.handleStopSession}
+            runningSession={focusSession.runningSession}
+            lastFinishedSessionTask={focusSession.lastFinishedSessionTask}
+            setLastFinishedSessionTask={focusSession.setLastFinishedSessionTask}
             getTaskFocusMinutes={getTaskFocusMinutesForPanel}
           />
         )}
@@ -405,7 +297,7 @@ export default function AppShell() {
             setTaskFilterDateScope={setTaskFilterDateScope}
             handleCreateTask={handleCreateTask}
             handleUpdateTaskStatus={handleUpdateTaskStatus}
-            handleStartSession={handleStartSession}
+            handleStartSession={focusSession.handleStartSession}
             handleDeleteTask={handleDeleteTask}
           />
         )}
@@ -451,16 +343,16 @@ export default function AppShell() {
             metrics={reportStats.weeklyMetrics}
           />
         )}
-        {activeTab === 'focus' && runningSession && (
+        {activeTab === 'focus' && focusSession.runningSession && (
           <FocusPanel
             styleContext={{primary: styleContext.primary, primaryLight: styleContext.primaryLight, secondary: styleContext.secondary}}
-            runningSession={runningSession}
-            focusTimeElapsed={focusTimeElapsed}
-            formattedElapsed={focusController.formattedElapsed}
-            progressOffset={focusController.progressOffset}
-            handleStopSession={handleStopSession}
-            handlePauseSession={handlePauseSession}
-            handleResumeSession={handleResumeSession}
+            runningSession={focusSession.runningSession}
+            focusTimeElapsed={focusSession.focusTimeElapsed}
+            formattedElapsed={focusSession.formattedElapsed}
+            progressOffset={focusSession.progressOffset}
+            handleStopSession={focusSession.handleStopSession}
+            handlePauseSession={focusSession.handlePauseSession}
+            handleResumeSession={focusSession.handleResumeSession}
           />
         )}
       </main>
