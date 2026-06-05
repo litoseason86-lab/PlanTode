@@ -1,14 +1,8 @@
 import {useEffect, useMemo, useRef, useState, type FormEvent} from 'react';
 import {
   Calendar,
-  CalendarRange,
-  ClipboardList,
-  LayoutDashboard,
-  ListTodo,
   Loader2,
   Square,
-  Tags,
-  Timer,
 } from 'lucide-react';
 
 import type {Category, Task, TaskExecutionSession} from '../../shared/domain/entities';
@@ -25,13 +19,15 @@ import {DailyReportPanel} from '../modules/reports/components/DailyReportPanel';
 import {buildDailyReportMetrics} from '../modules/reports/controllers/useDailyReportController';
 import {WeeklyReviewPanel} from '../modules/reports/components/WeeklyReviewPanel';
 import {buildWeeklyReviewMetrics} from '../modules/reports/controllers/useWeeklyReviewController';
-import {APP_TABS, type AppTab} from './navigation';
+import {type AppTab} from './navigation';
 import {THEME_STYLES, type ThemeId} from './theme';
 import {tasksApi} from '../modules/tasks/api/tasksApi';
 import {filterTasks} from '../modules/tasks/controllers/useTasksController';
 import {TasksPanel} from '../modules/tasks/components/TasksPanel';
 import {calculateEffectiveFocusSeconds} from '../modules/focus/controllers/useFocusController';
+import {AppHeader} from './components/AppHeader';
 import {AppToast} from './components/AppToast';
+import {GlobalRunningBar} from './components/GlobalRunningBar';
 import {getErrorMessage} from './errors';
 import {useToast} from './hooks/useToast';
 
@@ -457,15 +453,6 @@ export default function AppShell() {
       focusTimeElapsed,
     });
 
-  const iconMap = {
-    today: LayoutDashboard,
-    tasks: ListTodo,
-    categories: Tags,
-    daily: ClipboardList,
-    weekly: CalendarRange,
-    focus: Timer,
-  } as const;
-
   return (
     <div className="min-h-screen text-[#413333] font-sans selection:bg-rose-100 pb-12 transition-colors duration-300" style={{backgroundColor: styleContext.bg}} id="app_frame">
       <style>{`
@@ -491,67 +478,23 @@ export default function AppShell() {
       />
 
       {runningSession && activeTab !== 'focus' && (
-        <div onClick={() => setActiveTab('focus')} className="fixed bottom-6 right-6 bg-slate-900/95 backdrop-blur-xl text-white px-5 py-3.5 rounded-2xl shadow-2xl shadow-slate-900/20 flex items-center gap-3.5 cursor-pointer z-40 hover:scale-[1.03] hover:shadow-2xl transition-all duration-300 ring-1 ring-white/10" id="global_running_bar">
-          <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-rose-500/20 flex items-center justify-center"><Timer className="w-4.5 h-4.5 text-rose-400" /></div>
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-400 rounded-full ring-2 ring-slate-900 animate-pulse" />
-          </div>
-          <div className="text-left min-w-0">
-            <p className="text-[9px] uppercase tracking-widest text-rose-400/70 font-semibold">心流引擎运行中</p>
-            <p className="text-xs font-semibold truncate max-w-[160px] text-white/90">{runningSession.taskTitle || '主线专注中'}</p>
-          </div>
-          <span className="bg-white/10 text-rose-300 font-mono text-xs font-bold px-3 py-1.5 rounded-xl shrink-0 tabular-nums">
-            {Math.floor(focusTimeElapsed / 60)}:{String(focusTimeElapsed % 60).padStart(2, '0')}
-          </span>
-        </div>
+        <GlobalRunningBar
+          runningSession={runningSession}
+          focusTimeElapsed={focusTimeElapsed}
+          onOpenFocus={() => setActiveTab('focus')}
+        />
       )}
 
-      <header className="bg-white/70 backdrop-blur-xl sticky top-0 z-40 border-b border-slate-200/30 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all duration-300">
-        <div className="max-w-[1280px] mx-auto px-6 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3 select-none cursor-default">
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-lg shadow-rose-200/30 transition-transform duration-300 hover:scale-105" style={{backgroundColor: styleContext.primary}}>🍑</div>
-            <div>
-              <h1 className="font-extrabold text-sm tracking-tight text-slate-800 uppercase leading-none">{activeTheme === 'peach' ? 'COZY MOMENT' : 'SIMPLE LIFE'}</h1>
-              <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-widest font-medium">时间专注沉淀手记</p>
-            </div>
-          </div>
-
-          <nav className="flex items-center gap-1 bg-white/60 backdrop-blur-sm rounded-2xl p-1.5 border border-slate-200/40 shadow-sm" id="horizontal_navigation_menu">
-            {APP_TABS.filter((tab) => tab.key !== 'focus').map((tab) => {
-              const Icon = iconMap[tab.key];
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => {setActiveTab(tab.key); clearError();}}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
-                    activeTab === tab.key ? 'text-white shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-700 hover:bg-white/80'
-                  }`}
-                  style={activeTab === tab.key ? {backgroundColor: styleContext.primary} : undefined}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-            {runningSession && (
-              <button
-                onClick={() => {setActiveTab('focus'); clearError();}}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
-                  activeTab === 'focus' ? 'bg-rose-500 text-white shadow-md shadow-rose-200/50' : 'bg-rose-50/80 text-rose-500 hover:bg-rose-100/80'
-                }`}
-              >
-                <Timer className={`w-3.5 h-3.5 ${runningSession.status === 'PAUSED' ? '' : 'animate-spin'}`} />
-                <span>{runningSession.status === 'PAUSED' ? '已暂停' : '专注中'}</span>
-              </button>
-            )}
-          </nav>
-
-          <div className="flex items-center gap-0.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/30">
-            <button onClick={() => setActiveTheme('peach')} className={`px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer ${activeTheme === 'peach' ? 'bg-white text-rose-600 shadow-sm ring-1 ring-rose-100' : 'text-slate-400 hover:text-slate-600'}`}>🍑 {THEME_STYLES.peach.name}</button>
-            <button onClick={() => setActiveTheme('beige')} className={`px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer ${activeTheme === 'beige' ? 'bg-white text-amber-700 shadow-sm ring-1 ring-amber-100' : 'text-slate-400 hover:text-slate-600'}`}>🪵 {THEME_STYLES.beige.name}</button>
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        activeTab={activeTab}
+        activeTheme={activeTheme}
+        hasRunningSession={Boolean(runningSession)}
+        runningSessionStatus={runningSession?.status}
+        primaryColor={styleContext.primary}
+        setActiveTab={setActiveTab}
+        setActiveTheme={setActiveTheme}
+        clearError={clearError}
+      />
 
       <main className="max-w-[1280px] mx-auto px-6 mt-8 space-y-6" id="main_content">
         {activeTab === 'today' && (
