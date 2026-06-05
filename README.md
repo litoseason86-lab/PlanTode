@@ -1,6 +1,6 @@
 # PlanTode
 
-PlanTode 是一个本地单用户计划管理工具，当前采用 `React + Express + JSON 文件存储`。
+PlanTode 是一个本地单用户计划管理工具，当前采用 `React + Express`，并支持 JSON 与 SQLite 两种本地存储。
 
 ## 开发命令
 
@@ -20,11 +20,29 @@ PlanTode 是一个本地单用户计划管理工具，当前采用 `React + Expr
 - `shared/`：前后端共享领域模型与基础工具
 - `server/app/`：服务装配与启动
 - `server/modules/`：后端业务模块
-- `server/storage/`：JSON 文件存储实现
+- `server/storage/`：本地存储装配与 JSON/SQLite 存储实现
 - `src/app/`：前端应用入口与装配
 - `src/modules/`：前端业务模块
 - `src/shared/`：前端共享请求层与通用能力
 
 ## 持久化说明
 
-当前默认持久化方案为 `data/db.json`。重构后业务逻辑通过仓储接口访问数据，不再直接依赖底层 JSON 结构。
+业务逻辑通过仓储接口访问数据，不直接依赖底层存储结构。
+
+## 存储驱动
+
+默认使用 JSON 文件存储：
+
+```bash
+STORAGE_DRIVER=json
+JSON_DB_PATH=data/db.json
+```
+
+也可以切换到 SQLite：
+
+```bash
+STORAGE_DRIVER=sqlite
+SQLITE_DB_PATH=data/plantode.sqlite
+```
+
+SQLite 使用 `better-sqlite3`，启动时会自动执行 schema migration。当前不包含 JSON 到 SQLite 的数据导入；历史数据迁移会作为独立工具处理。
