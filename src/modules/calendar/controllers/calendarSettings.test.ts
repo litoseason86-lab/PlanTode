@@ -20,6 +20,7 @@ describe('calendarSettings', () => {
       showCompleted: true,
       colorMode: 'category',
       showFocusSessions: true,
+      weekTimelineDensity: 'standard',
     });
   });
 
@@ -43,15 +44,43 @@ describe('calendarSettings', () => {
       showCompleted: false,
       colorMode: 'category',
       showFocusSessions: false,
+      weekTimelineDensity: 'comfortable',
     });
 
     expect(localStorage.getItem(CALENDAR_SETTINGS_STORAGE_KEY)).toContain('"visibleCategoryIds":[1,2]');
+    expect(localStorage.getItem(CALENDAR_SETTINGS_STORAGE_KEY)).toContain('"weekTimelineDensity":"comfortable"');
     expect(loadCalendarSettings()).toEqual({
       visibleCategoryIds: [1, 2],
       showCompleted: false,
       colorMode: 'category',
       showFocusSessions: false,
+      weekTimelineDensity: 'comfortable',
     });
+  });
+
+  it('fills density from defaults for legacy stored settings', () => {
+    localStorage.setItem(CALENDAR_SETTINGS_STORAGE_KEY, JSON.stringify({
+      visibleCategoryIds: [1],
+      showCompleted: false,
+      colorMode: 'category',
+      showFocusSessions: false,
+    }));
+
+    expect(loadCalendarSettings()).toEqual({
+      visibleCategoryIds: [1],
+      showCompleted: false,
+      colorMode: 'category',
+      showFocusSessions: false,
+      weekTimelineDensity: 'standard',
+    });
+  });
+
+  it('ignores invalid stored density values', () => {
+    localStorage.setItem(CALENDAR_SETTINGS_STORAGE_KEY, JSON.stringify({
+      weekTimelineDensity: 'giant',
+    }));
+
+    expect(loadCalendarSettings().weekTimelineDensity).toBe('standard');
   });
 
   it('falls back to defaults when storage is corrupt', () => {

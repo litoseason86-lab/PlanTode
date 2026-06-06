@@ -1,10 +1,15 @@
+import type {WeekTimelineDensity} from './weekTimelineInteraction';
+
 export const CALENDAR_SETTINGS_STORAGE_KEY = 'plantodo.calendar.settings';
+
+const WEEK_TIMELINE_DENSITIES = new Set<WeekTimelineDensity>(['compact', 'standard', 'comfortable']);
 
 export interface CalendarSettings {
   visibleCategoryIds: number[];
   showCompleted: boolean;
   colorMode: 'category';
   showFocusSessions: boolean;
+  weekTimelineDensity: WeekTimelineDensity;
 }
 
 export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
@@ -12,7 +17,14 @@ export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
   showCompleted: true,
   colorMode: 'category',
   showFocusSessions: true,
+  weekTimelineDensity: 'standard',
 };
+
+function parseWeekTimelineDensity(value: unknown): WeekTimelineDensity {
+  return typeof value === 'string' && WEEK_TIMELINE_DENSITIES.has(value as WeekTimelineDensity)
+    ? value as WeekTimelineDensity
+    : DEFAULT_CALENDAR_SETTINGS.weekTimelineDensity;
+}
 
 export function filterTasksForCalendar<T extends {categoryId: number; status: string}>(
   tasks: T[],
@@ -44,6 +56,7 @@ export function loadCalendarSettings(): CalendarSettings {
       showCompleted: typeof parsed.showCompleted === 'boolean' ? parsed.showCompleted : true,
       colorMode: 'category',
       showFocusSessions: typeof parsed.showFocusSessions === 'boolean' ? parsed.showFocusSessions : true,
+      weekTimelineDensity: parseWeekTimelineDensity(parsed.weekTimelineDensity),
     };
   } catch {
     return DEFAULT_CALENDAR_SETTINGS;
