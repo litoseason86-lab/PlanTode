@@ -42,6 +42,7 @@ export function CalendarPanel({categories, styleContext, showToast, initialDate}
             tasksByDate={controller.tasksByDate}
             categories={categories}
             onCreateDateTask={controller.createAllDayTask}
+            onScheduleDate={controller.scheduleTaskForDate}
           />
         )}
         {controller.view === 'week' && (

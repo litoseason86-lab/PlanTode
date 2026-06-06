@@ -13,6 +13,14 @@ vi.mock('../api/calendarApi', () => ({
   },
 }));
 
+function createDragData() {
+  const values = new Map<string, string>();
+  return {
+    setData: (type: string, value: string) => values.set(type, value),
+    getData: (type: string) => values.get(type) ?? '',
+  } as DataTransfer;
+}
+
 describe('CalendarPanel', () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -94,5 +102,36 @@ describe('CalendarPanel', () => {
     fireEvent.click(screen.getByLabelText('下一段'));
 
     expect(screen.getByText('2026-04-30')).toBeInTheDocument();
+  });
+
+  it('drags a task to a month date cell', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([
+      {id: 1, userId: 1, categoryId: 1, title: '拖拽任务', plannedDate: '2026-06-06', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+    ]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
+
+    render(
+      <CalendarPanel
+        categories={[{id: 1, userId: 1, name: '工作', color: '#ef4444', sortOrder: 1, createdAt: '', updatedAt: ''}]}
+        styleContext={{primary: '#fb7185', primaryLight: '#ffe4e6', secondary: '#fda4af'}}
+        showToast={vi.fn()}
+        initialDate="2026-06-06"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', {name: '月'}));
+
+    const task = await screen.findByText('拖拽任务');
+    const target = screen.getByLabelText('2026-06-08');
+    const data = createDragData();
+
+    fireEvent.dragStart(task, {dataTransfer: data});
+    fireEvent.drop(target, {dataTransfer: data});
+
+    expect(calendarApi.updateTaskSchedule).toHaveBeenCalledWith(1, expect.objectContaining({
+      plannedDate: '2026-06-08',
+      allDay: true,
+    }));
   });
 });
