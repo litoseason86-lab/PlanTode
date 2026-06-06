@@ -18,7 +18,7 @@ function createDragData() {
   return {
     setData: (type: string, value: string) => values.set(type, value),
     getData: (type: string) => values.get(type) ?? '',
-  } as DataTransfer;
+  } as unknown as DataTransfer;
 }
 
 describe('CalendarPanel', () => {
