@@ -37,11 +37,15 @@ describe('sqlite row mappers', () => {
         category_id: 1,
         title: '写方案',
         planned_date: '2026-06-05',
+        planned_end_date: null,
+        start_at: null,
+        end_at: null,
+        all_day: 1,
         status: 'TODO',
         created_at: '2026-06-05T00:00:00.000Z',
         updated_at: '2026-06-05T00:00:00.000Z',
-      }).categoryId,
-    ).toBe(1);
+      }),
+    ).toMatchObject({categoryId: 1, allDay: true});
 
     expect(
       mapSessionRow({

@@ -171,4 +171,51 @@ describe('TaskJsonRepository', () => {
     expect(data.tasks.map((task) => task.id)).toEqual([2]);
     expect(data.taskExecutionSessions.map((session) => session.id)).toEqual([2]);
   });
+
+  it('normalizes legacy tasks and filters by schedule range', () => {
+    const filePath = createTempFilePath();
+    const store = new JsonFileStore(filePath);
+    const repository = new TaskJsonRepository(store);
+
+    store.write({
+      users: [],
+      categories: [],
+      tasks: [
+        {id: 1, userId: 1, categoryId: 1, title: 'Legacy', plannedDate: '2026-06-06', status: 'TODO', createdAt: '', updatedAt: ''} as never,
+        {id: 2, userId: 1, categoryId: 1, title: 'Cross', plannedDate: '2026-06-05', plannedEndDate: '2026-06-07', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+      ],
+      taskExecutionSessions: [],
+      dailyReports: [],
+      weeklyReviews: [],
+      sequences: {categories: 0, tasks: 2, taskExecutionSessions: 0, dailyReports: 0, weeklyReviews: 0},
+    });
+
+    const result = repository.listByFilters({userId: 1, dateFrom: '2026-06-06', dateTo: '2026-06-06'});
+
+    expect(result.map((task) => task.title)).toEqual(['Legacy', 'Cross']);
+    expect(result[0]).toMatchObject({allDay: true, startAt: undefined, endAt: undefined});
+  });
+
+  it('updates schedules in json storage', () => {
+    const filePath = createTempFilePath();
+    const store = new JsonFileStore(filePath);
+    const repository = new TaskJsonRepository(store);
+
+    const created = repository.create({userId: 1, categoryId: 1, title: 'Timed', plannedDate: '2026-06-06'});
+    const updated = repository.updateSchedule({
+      taskId: created.id,
+      userId: 1,
+      plannedDate: '2026-06-06',
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+      allDay: false,
+    });
+
+    expect(updated).toMatchObject({
+      allDay: false,
+      plannedEndDate: undefined,
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+    });
+  });
 });

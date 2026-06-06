@@ -17,6 +17,10 @@ export interface TaskRow {
   category_id: number;
   title: string;
   planned_date: string;
+  planned_end_date?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
+  all_day?: number;
   status: string;
   created_at: string;
   updated_at: string;
@@ -76,7 +80,10 @@ export function mapTaskRow(row: TaskRow): Task {
     categoryId: row.category_id,
     title: row.title,
     plannedDate: row.planned_date,
-    allDay: true,
+    plannedEndDate: row.planned_end_date ?? undefined,
+    startAt: row.start_at ?? undefined,
+    endAt: row.end_at ?? undefined,
+    allDay: row.all_day !== 0,
     status: row.status as TaskStatus,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

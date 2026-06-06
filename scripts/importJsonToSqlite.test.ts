@@ -174,4 +174,82 @@ describe('importJsonToSqlite', () => {
     expect(reloaded.prepare('select id, name from categories order by id').all()).toEqual([{id: 7, name: '学习'}]);
     reloaded.close();
   });
+
+  it('imports legacy and scheduled task fields', () => {
+    const {jsonPath, sqlitePath} = createTestFiles();
+    fs.writeFileSync(
+      jsonPath,
+      JSON.stringify({
+        users: [
+          {
+            id: 1,
+            username: 'demo',
+            displayName: 'Demo User',
+            createdAt: '',
+          },
+        ],
+        categories: [
+          {
+            id: 1,
+            userId: 1,
+            name: '工作',
+            color: '#ef4444',
+            sortOrder: 1,
+            createdAt: '',
+            updatedAt: '',
+          },
+        ],
+        tasks: [
+          {
+            id: 1,
+            userId: 1,
+            categoryId: 1,
+            title: '旧任务',
+            plannedDate: '2026-06-06',
+            status: 'TODO',
+            createdAt: '',
+            updatedAt: '',
+          },
+          {
+            id: 2,
+            userId: 1,
+            categoryId: 1,
+            title: '会议',
+            plannedDate: '2026-06-06',
+            startAt: '2026-06-06T09:00:00.000',
+            endAt: '2026-06-06T10:00:00.000',
+            allDay: false,
+            status: 'TODO',
+            createdAt: '',
+            updatedAt: '',
+          },
+        ],
+      }),
+    );
+
+    importJsonToSqlite({jsonPath, sqlitePath});
+
+    const db = openSqliteClient(sqlitePath);
+    expect(
+      db.prepare('select id, title, planned_end_date, start_at, end_at, all_day from tasks order by id').all(),
+    ).toEqual([
+      {
+        id: 1,
+        title: '旧任务',
+        planned_end_date: null,
+        start_at: null,
+        end_at: null,
+        all_day: 1,
+      },
+      {
+        id: 2,
+        title: '会议',
+        planned_end_date: null,
+        start_at: '2026-06-06T09:00:00.000',
+        end_at: '2026-06-06T10:00:00.000',
+        all_day: 0,
+      },
+    ]);
+    db.close();
+  });
 });

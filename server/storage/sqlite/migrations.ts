@@ -102,6 +102,19 @@ const migrations: Migration[] = [
       alter table task_execution_sessions add column accumulated_pause_seconds integer not null default 0;
     `,
   },
+  {
+    version: 3,
+    name: 'task_schedule_fields',
+    sql: `
+      alter table tasks add column planned_end_date text;
+      alter table tasks add column start_at text;
+      alter table tasks add column end_at text;
+      alter table tasks add column all_day integer not null default 1;
+
+      create index if not exists idx_tasks_user_planned_end_date on tasks(user_id, planned_end_date);
+      create index if not exists idx_tasks_user_start_at on tasks(user_id, start_at);
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

@@ -58,4 +58,37 @@ describe('TaskSqliteRepository', () => {
       count: 0,
     });
   });
+
+  it('persists schedule fields and filters intersecting ranges', () => {
+    const category = categories.create({userId: 1, name: '工作', color: '#ef4444', sortOrder: 1});
+    const task = tasks.create({
+      userId: 1,
+      categoryId: category.id,
+      title: '跨天',
+      plannedDate: '2026-06-05',
+      plannedEndDate: '2026-06-07',
+      allDay: true,
+    });
+
+    expect(task).toMatchObject({plannedEndDate: '2026-06-07', allDay: true});
+    expect(
+      tasks.listByFilters({userId: 1, dateFrom: '2026-06-06', dateTo: '2026-06-06'}).map((item) => item.title),
+    ).toEqual(['跨天']);
+
+    const updated = tasks.updateSchedule({
+      taskId: task.id,
+      userId: 1,
+      plannedDate: '2026-06-06',
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+      allDay: false,
+    });
+
+    expect(updated).toMatchObject({
+      allDay: false,
+      plannedEndDate: undefined,
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+    });
+  });
 });
