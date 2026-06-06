@@ -23,6 +23,7 @@ const baseTasks = [
     categoryId: 1,
     title: '写周报',
     plannedDate: '2026-06-05',
+    allDay: true,
     status: 'TODO' as const,
     createdAt: '',
     updatedAt: '',

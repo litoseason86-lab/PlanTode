@@ -56,6 +56,7 @@ describe('CategoriesService', () => {
             categoryId: 2,
             title: '任务',
             plannedDate: '2026-06-05',
+            allDay: true,
             status: 'TODO',
             createdAt: '',
             updatedAt: '',
@@ -67,4 +68,3 @@ describe('CategoriesService', () => {
     expect(() => service.remove(2, 1)).toThrow('referencing');
   });
 });
-

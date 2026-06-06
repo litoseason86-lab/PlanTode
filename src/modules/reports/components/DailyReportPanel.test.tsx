@@ -9,6 +9,7 @@ const task = {
   categoryId: 1,
   title: '写方案',
   plannedDate: '2026-06-05',
+  allDay: true,
   status: 'DONE' as const,
   createdAt: '',
   updatedAt: '',

@@ -11,6 +11,7 @@ describe('filterTasks', () => {
         categoryId: 1,
         title: 'A',
         plannedDate: '2026-06-05',
+        allDay: true,
         status: 'TODO' as const,
         createdAt: '',
         updatedAt: '',
@@ -21,6 +22,7 @@ describe('filterTasks', () => {
         categoryId: 2,
         title: 'B',
         plannedDate: '2026-06-05',
+        allDay: true,
         status: 'DONE' as const,
         createdAt: '',
         updatedAt: '',
@@ -37,4 +39,3 @@ describe('filterTasks', () => {
     expect(result.map((task) => task.id)).toEqual([2]);
   });
 });
-

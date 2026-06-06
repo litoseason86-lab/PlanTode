@@ -76,6 +76,7 @@ export function mapTaskRow(row: TaskRow): Task {
     categoryId: row.category_id,
     title: row.title,
     plannedDate: row.planned_date,
+    allDay: true,
     status: row.status as TaskStatus,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

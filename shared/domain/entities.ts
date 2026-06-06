@@ -23,6 +23,10 @@ export interface Task {
   categoryId: number;
   title: string;
   plannedDate: string;
+  plannedEndDate?: string;
+  startAt?: string;
+  endAt?: string;
+  allDay: boolean;
   status: TaskStatus;
   createdAt: string;
   updatedAt: string;

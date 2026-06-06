@@ -22,6 +22,7 @@ const tasks = [
     categoryId: 1,
     title: '写方案',
     plannedDate: '2026-06-05',
+    allDay: true,
     status: 'TODO' as const,
     createdAt: '',
     updatedAt: '',

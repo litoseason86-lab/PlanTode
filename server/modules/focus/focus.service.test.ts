@@ -37,6 +37,7 @@ describe('FocusService', () => {
       categoryId: 1,
       title: '任务',
       plannedDate: '2026-06-05',
+      allDay: true,
       status: 'TODO' as const,
       createdAt: '',
       updatedAt: '',

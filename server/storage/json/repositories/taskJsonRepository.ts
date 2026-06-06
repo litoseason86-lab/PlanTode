@@ -39,6 +39,7 @@ export class TaskJsonRepository implements TaskRepository {
         categoryId: input.categoryId,
         title: input.title.trim(),
         plannedDate: input.plannedDate,
+        allDay: true,
         status: 'TODO',
         createdAt: now,
         updatedAt: now,
