@@ -77,6 +77,57 @@ describe('WeekTimelineView', () => {
     expect(onScheduleDate).toHaveBeenCalledWith(1, '2026-06-06');
   });
 
+  it('renders duplicated cross-day all-day tasks as one continuous segment', () => {
+    const crossDayTask = {
+      ...task,
+      id: 2,
+      title: '跨天任务',
+      plannedDate: '2026-06-05',
+      plannedEndDate: '2026-06-07',
+    };
+
+    renderWeek({
+      tasksByDate: {
+        '2026-06-05': [crossDayTask],
+        '2026-06-06': [crossDayTask],
+        '2026-06-07': [crossDayTask],
+      },
+    });
+
+    expect(screen.getByLabelText('2026-06-05 至 2026-06-07 跨天任务')).toBeInTheDocument();
+    expect(screen.getAllByText('跨天任务')).toHaveLength(1);
+  });
+
+  it('renders overlapping all-day segments once each', () => {
+    const firstTask = {
+      ...task,
+      id: 2,
+      title: '跨天任务 A',
+      plannedDate: '2026-06-03',
+      plannedEndDate: '2026-06-05',
+    };
+    const secondTask = {
+      ...task,
+      id: 3,
+      title: '跨天任务 B',
+      plannedDate: '2026-06-04',
+      plannedEndDate: '2026-06-06',
+    };
+
+    renderWeek({
+      tasksByDate: {
+        '2026-06-03': [firstTask],
+        '2026-06-04': [firstTask, secondTask],
+        '2026-06-05': [firstTask, secondTask],
+        '2026-06-06': [secondTask],
+      },
+    });
+
+    expect(screen.getByLabelText('2026-06-03 至 2026-06-05 跨天任务 A')).toBeInTheDocument();
+    expect(screen.getByLabelText('2026-06-04 至 2026-06-06 跨天任务 B')).toBeInTheDocument();
+    expect(screen.getAllByText(/跨天任务 [AB]/)).toHaveLength(2);
+  });
+
   it('rejects batch payloads on time slots', () => {
     const onRejectBatchTimeDrop = vi.fn();
     renderWeek({onRejectBatchTimeDrop});

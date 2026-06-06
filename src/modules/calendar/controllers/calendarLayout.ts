@@ -17,6 +17,12 @@ export interface AllDaySegment {
   continuesAfter: boolean;
 }
 
+export interface WeekAllDaySegment extends AllDaySegment {
+  startIndex: number;
+  span: number;
+  rowIndex: number;
+}
+
 function monthOf(isoDate: string): string {
   return isoDate.slice(0, 7);
 }
@@ -108,4 +114,50 @@ export function segmentAllDayTask(task: Task, dateFrom: string, dateTo: string):
     continuesBefore: canonical.plannedDate < dateFrom,
     continuesAfter: realEnd > dateTo,
   };
+}
+
+export function buildWeekAllDaySegments(input: {
+  dateFrom: string;
+  dateTo: string;
+  tasks: Task[];
+}): WeekAllDaySegment[] {
+  const dateIndexes = new Map(enumerateDateRange(input.dateFrom, input.dateTo).map((date, index) => [date, index]));
+  const sortedSegments = input.tasks
+    .filter((task) => task.allDay === true && Boolean(task.plannedDate))
+    .filter((task) => taskIntersectsDateRange(task, input.dateFrom, input.dateTo))
+    .map((task) => {
+      const segment = segmentAllDayTask(task, input.dateFrom, input.dateTo);
+      const startIndex = dateIndexes.get(segment.startsOn);
+      const endIndex = dateIndexes.get(segment.endsOn);
+
+      if (startIndex === undefined || endIndex === undefined) {
+        return undefined;
+      }
+
+      return {
+        ...segment,
+        startIndex,
+        span: endIndex - startIndex + 1,
+      };
+    })
+    .filter((segment): segment is Omit<WeekAllDaySegment, 'rowIndex'> => Boolean(segment))
+    .sort((left, right) => (
+      left.startIndex - right.startIndex ||
+      right.span - left.span ||
+      left.taskId - right.taskId
+    ));
+
+  const rowEndIndexes: number[] = [];
+
+  return sortedSegments.map((segment) => {
+    const endIndex = segment.startIndex + segment.span - 1;
+    const reusableRowIndex = rowEndIndexes.findIndex((rowEndIndex) => rowEndIndex < segment.startIndex);
+    const rowIndex = reusableRowIndex === -1 ? rowEndIndexes.length : reusableRowIndex;
+    rowEndIndexes[rowIndex] = endIndex;
+
+    return {
+      ...segment,
+      rowIndex,
+    };
+  });
 }
