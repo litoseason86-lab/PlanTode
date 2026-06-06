@@ -26,6 +26,17 @@ export function addIsoDateDays(dateInput: string, days: number): string {
   return formatUtcDate(date);
 }
 
+export function addIsoDateMonths(dateInput: string, months: number): string {
+  const {year, month, day} = parseIsoDateParts(dateInput);
+  const targetMonthStart = new Date(Date.UTC(year, month - 1 + months, 1));
+  const targetYear = targetMonthStart.getUTCFullYear();
+  const targetMonth = targetMonthStart.getUTCMonth();
+  const targetMonthEnd = new Date(Date.UTC(targetYear, targetMonth + 1, 0));
+  const clampedDay = Math.min(day, targetMonthEnd.getUTCDate());
+
+  return formatUtcDate(new Date(Date.UTC(targetYear, targetMonth, clampedDay)));
+}
+
 export function getIsoDateWeekday(dateInput: string): number {
   const {year, month, day} = parseIsoDateParts(dateInput);
 

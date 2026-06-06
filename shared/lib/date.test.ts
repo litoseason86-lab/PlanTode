@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addIsoDateDays, getChinaDateUtcRange, getWeekStart, isIsoDateString, toIsoDate } from './date';
+import { addIsoDateDays, addIsoDateMonths, getChinaDateUtcRange, getWeekStart, isIsoDateString, toIsoDate } from './date';
 
 describe('toIsoDate', () => {
   it('returns the China calendar date in ISO format', () => {
@@ -44,6 +44,13 @@ describe('addIsoDateDays', () => {
   it('adds calendar days without relying on host timezone parsing', () => {
     expect(addIsoDateDays('2026-12-31', 1)).toBe('2027-01-01');
     expect(addIsoDateDays('2026-01-01', -1)).toBe('2025-12-31');
+  });
+});
+
+describe('addIsoDateMonths', () => {
+  it('adds calendar months and clamps to the target month end', () => {
+    expect(addIsoDateMonths('2026-03-31', 1)).toBe('2026-04-30');
+    expect(addIsoDateMonths('2026-03-31', -1)).toBe('2026-02-28');
   });
 });
 

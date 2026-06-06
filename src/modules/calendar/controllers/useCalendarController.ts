@@ -19,6 +19,7 @@ interface UseCalendarControllerArgs {
 
 export function useCalendarController({categories, initialDate, showToast}: UseCalendarControllerArgs) {
   const showToastRef = useRef(showToast);
+  const refreshSeqRef = useRef(0);
   const [view, setView] = useState<CalendarView>('week');
   const [anchorDate, setAnchorDate] = useState(() => initialDate ?? toIsoDate(new Date()));
   const [settings, setSettingsState] = useState<CalendarSettings>(() => loadCalendarSettings());
@@ -29,6 +30,11 @@ export function useCalendarController({categories, initialDate, showToast}: UseC
   const range = useMemo(() => getCalendarRange(view, anchorDate), [view, anchorDate]);
   const tasks = useMemo(() => filterTasksForCalendar(rawTasks, settings), [rawTasks, settings]);
   const tasksByDate = useMemo(() => groupTasksByDate(tasks, range.dateFrom, range.dateTo), [tasks, range.dateFrom, range.dateTo]);
+  const rangeRef = useRef(range);
+  const settingsRef = useRef(settings);
+
+  rangeRef.current = range;
+  settingsRef.current = settings;
 
   const setSettings = useCallback((next: CalendarSettings) => {
     setSettingsState(next);
@@ -40,51 +46,70 @@ export function useCalendarController({categories, initialDate, showToast}: UseC
   }, [showToast]);
 
   const refreshCalendarData = useCallback(async () => {
+    const refreshSeq = refreshSeqRef.current + 1;
+    refreshSeqRef.current = refreshSeq;
+    const currentRange = rangeRef.current;
+    const currentSettings = settingsRef.current;
     setLoading(true);
     try {
-      const categoryId = settings.visibleCategoryIds.length === 1 ? settings.visibleCategoryIds[0] : undefined;
+      const categoryId = currentSettings.visibleCategoryIds.length === 1 ? currentSettings.visibleCategoryIds[0] : undefined;
       const [taskData, sessionData] = await Promise.all([
-        calendarApi.getCalendarTasks({...range, categoryId}),
-        settings.showFocusSessions ? calendarApi.getFocusSessions(range) : Promise.resolve([]),
+        calendarApi.getCalendarTasks({...currentRange, categoryId}),
+        currentSettings.showFocusSessions ? calendarApi.getFocusSessions(currentRange) : Promise.resolve([]),
       ]);
+      if (refreshSeq !== refreshSeqRef.current) {
+        return;
+      }
       setRawTasks(taskData);
       setFocusSessions(sessionData);
     } catch (error) {
-      showToastRef.current(error instanceof Error ? error.message : '日历数据加载失败', 'error');
+      if (refreshSeq === refreshSeqRef.current) {
+        showToastRef.current(error instanceof Error ? error.message : '日历数据加载失败', 'error');
+      }
     } finally {
-      setLoading(false);
+      if (refreshSeq === refreshSeqRef.current) {
+        setLoading(false);
+      }
     }
-  }, [range, settings.showFocusSessions, settings.visibleCategoryIds]);
+  }, []);
 
   useEffect(() => {
     void refreshCalendarData();
-  }, [refreshCalendarData]);
+  }, [refreshCalendarData, range, settings.showFocusSessions, settings.visibleCategoryIds]);
 
   async function scheduleTaskForDate(taskId: number, plannedDate: string) {
-    await calendarApi.updateTaskSchedule(taskId, {
-      plannedDate,
-      plannedEndDate: undefined,
-      startAt: undefined,
-      endAt: undefined,
-      allDay: true,
-    });
-    await refreshCalendarData();
+    try {
+      await calendarApi.updateTaskSchedule(taskId, {
+        plannedDate,
+        plannedEndDate: undefined,
+        startAt: undefined,
+        endAt: undefined,
+        allDay: true,
+      });
+      await refreshCalendarData();
+    } catch (error) {
+      showToastRef.current(error instanceof Error ? error.message : '任务排期失败', 'error');
+    }
   }
 
   async function createAllDayTask(plannedDate: string, title = '新任务') {
     const categoryId = categories[0]?.id;
     if (!categoryId) {
-      showToast('请先创建分类', 'error');
+      showToastRef.current('请先创建分类', 'error');
       return;
     }
 
-    await calendarApi.createCalendarTask({
-      title,
-      categoryId,
-      plannedDate,
-      allDay: true,
-    });
-    await refreshCalendarData();
+    try {
+      await calendarApi.createCalendarTask({
+        title,
+        categoryId,
+        plannedDate,
+        allDay: true,
+      });
+      await refreshCalendarData();
+    } catch (error) {
+      showToastRef.current(error instanceof Error ? error.message : '任务创建失败', 'error');
+    }
   }
 
   return {

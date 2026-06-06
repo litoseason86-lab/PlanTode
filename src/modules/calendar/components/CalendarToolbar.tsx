@@ -1,6 +1,6 @@
 import {ChevronLeft, ChevronRight, Settings} from 'lucide-react';
 
-import {addIsoDateDays} from '../../../../shared/lib/date';
+import {addIsoDateDays, addIsoDateMonths} from '../../../../shared/lib/date';
 import type {CalendarView} from '../controllers/calendarLayout';
 
 interface CalendarToolbarProps {
@@ -12,7 +12,11 @@ interface CalendarToolbarProps {
 }
 
 export function CalendarToolbar({view, anchorDate, setView, setAnchorDate, onOpenSettings}: CalendarToolbarProps) {
-  const step = view === 'month' ? 28 : 7;
+  const moveDate = (direction: -1 | 1) => (
+    view === 'month'
+      ? addIsoDateMonths(anchorDate, direction)
+      : addIsoDateDays(anchorDate, direction * 7)
+  );
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -21,10 +25,10 @@ export function CalendarToolbar({view, anchorDate, setView, setAnchorDate, onOpe
         <p className="text-xs font-semibold text-slate-400">{anchorDate}</p>
       </div>
       <div className="flex items-center gap-2">
-        <button type="button" aria-label="上一段" onClick={() => setAnchorDate(addIsoDateDays(anchorDate, -step))} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-slate-600">
+        <button type="button" aria-label="上一段" onClick={() => setAnchorDate(moveDate(-1))} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-slate-600">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <button type="button" aria-label="下一段" onClick={() => setAnchorDate(addIsoDateDays(anchorDate, step))} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-slate-600">
+        <button type="button" aria-label="下一段" onClick={() => setAnchorDate(moveDate(1))} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-slate-600">
           <ChevronRight className="h-4 w-4" />
         </button>
         <div className="flex rounded-lg border border-slate-200 bg-white p-1">

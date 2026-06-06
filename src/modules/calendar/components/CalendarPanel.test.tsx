@@ -1,5 +1,5 @@
 import {fireEvent, render, screen} from '@testing-library/react';
-import {describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {calendarApi} from '../api/calendarApi';
 import {CalendarPanel} from './CalendarPanel';
@@ -14,6 +14,11 @@ vi.mock('../api/calendarApi', () => ({
 }));
 
 describe('CalendarPanel', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
   it('renders calendar shell and view switcher', () => {
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
@@ -70,5 +75,24 @@ describe('CalendarPanel', () => {
     fireEvent.click(screen.getByLabelText('显示设置'));
     fireEvent.click(screen.getByLabelText('显示已完成'));
     expect(screen.queryByText('完成任务')).not.toBeInTheDocument();
+  });
+
+  it('moves month view by calendar months', () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+
+    render(
+      <CalendarPanel
+        categories={[]}
+        styleContext={{primary: '#fb7185', primaryLight: '#ffe4e6', secondary: '#fda4af'}}
+        showToast={vi.fn()}
+        initialDate="2026-03-31"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', {name: '月'}));
+    fireEvent.click(screen.getByLabelText('下一段'));
+
+    expect(screen.getByText('2026-04-30')).toBeInTheDocument();
   });
 });
