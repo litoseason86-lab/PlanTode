@@ -19,6 +19,14 @@ const task = {
   updatedAt: '',
 } as const;
 
+function createDragData() {
+  const values = new Map<string, string>();
+  return {
+    setData: (type: string, value: string) => values.set(type, value),
+    getData: (type: string) => values.get(type) ?? '',
+  } as DataTransfer;
+}
+
 describe('MonthCalendarView', () => {
   it('creates a task when an empty date cell is clicked', () => {
     const createTask = vi.fn().mockResolvedValue(undefined);
@@ -29,6 +37,7 @@ describe('MonthCalendarView', () => {
         tasksByDate={{}}
         categories={categories}
         onCreateDateTask={createTask}
+        onScheduleDate={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 
@@ -46,6 +55,7 @@ describe('MonthCalendarView', () => {
         tasksByDate={{'2026-06-06': [task]}}
         categories={categories}
         onCreateDateTask={createTask}
+        onScheduleDate={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 
@@ -54,16 +64,23 @@ describe('MonthCalendarView', () => {
     expect(createTask).not.toHaveBeenCalled();
   });
 
-  it('does not expose unfinished drag scheduling behavior', () => {
+  it('schedules a task when it is dropped onto a date cell', () => {
+    const scheduleDate = vi.fn().mockResolvedValue(undefined);
+
     render(
       <MonthCalendarView
         anchorDate="2026-06-06"
         tasksByDate={{'2026-06-06': [task]}}
         categories={categories}
         onCreateDateTask={vi.fn().mockResolvedValue(undefined)}
+        onScheduleDate={scheduleDate}
       />,
     );
 
-    expect(screen.getByText('写方案')).not.toHaveAttribute('draggable');
+    const data = createDragData();
+    fireEvent.dragStart(screen.getByText('写方案'), {dataTransfer: data});
+    fireEvent.drop(screen.getByRole('button', {name: '2026-06-08'}), {dataTransfer: data});
+
+    expect(scheduleDate).toHaveBeenCalledWith(1, '2026-06-08');
   });
 });

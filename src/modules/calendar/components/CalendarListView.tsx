@@ -1,4 +1,5 @@
-import type {Category, Task} from '../../../../shared/domain/entities';
+import type {Category, Task, TaskExecutionSession} from '../../../../shared/domain/entities';
+import {toIsoDate} from '../../../../shared/lib/date';
 import {enumerateDateRange} from '../../../../shared/lib/schedule';
 
 interface CalendarListViewProps {
@@ -6,13 +7,30 @@ interface CalendarListViewProps {
   dateTo: string;
   tasksByDate: Record<string, Task[]>;
   categories: Category[];
+  focusSessions: TaskExecutionSession[];
+  showFocusSessions: boolean;
 }
 
 function categoryColor(categories: Category[], categoryId: number): string {
   return categories.find((category) => category.id === categoryId)?.color ?? '#64748b';
 }
 
-export function CalendarListView({dateFrom, dateTo, tasksByDate, categories}: CalendarListViewProps) {
+function focusDate(session: TaskExecutionSession): string {
+  return toIsoDate(new Date(session.startedAt));
+}
+
+function focusMinutes(session: TaskExecutionSession): number {
+  return Math.round((session.durationSeconds ?? 0) / 60);
+}
+
+export function CalendarListView({
+  dateFrom,
+  dateTo,
+  tasksByDate,
+  categories,
+  focusSessions,
+  showFocusSessions,
+}: CalendarListViewProps) {
   return (
     <div className="space-y-3">
       {enumerateDateRange(dateFrom, dateTo).map((date) => (
@@ -28,6 +46,13 @@ export function CalendarListView({dateFrom, dateTo, tasksByDate, categories}: Ca
                 )}
               </div>
             ))}
+            {showFocusSessions && focusSessions
+              .filter((session) => focusDate(session) === date)
+              .map((session) => (
+                <div key={`focus-${session.id}`} className="mt-2 rounded-md bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-600">
+                  专注 {focusMinutes(session)}m
+                </div>
+              ))}
           </div>
         </section>
       ))}

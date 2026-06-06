@@ -1,11 +1,13 @@
 import {useEffect, useState} from 'react';
 
-import type {Category, Task} from '../../../../shared/domain/entities';
+import type {Category, Task, TaskExecutionSession} from '../../../../shared/domain/entities';
+import {toIsoDate} from '../../../../shared/lib/date';
 import {buildWeekDays} from '../controllers/calendarLayout';
 import {
   TIMELINE_END_HOUR,
   TIMELINE_SLOT_MINUTES,
   TIMELINE_START_HOUR,
+  buildFocusSessionBlock,
   buildTimedTaskBlock,
 } from '../controllers/weekTimelineLayout';
 
@@ -15,6 +17,8 @@ interface WeekTimelineViewProps {
   anchorDate: string;
   tasksByDate: Record<string, Task[]>;
   categories: Category[];
+  focusSessions: TaskExecutionSession[];
+  showFocusSessions: boolean;
   onScheduleTime: (input: {taskId: number; date: string; hour: number; minute: number}) => Promise<void>;
   onMoveTimedTask: (input: {taskId: number; date: string; hour: number; minute: number; durationMinutes: number}) => Promise<void>;
   onResizeTimedTask: (input: {taskId: number; plannedDate: string; startAt: string; durationMinutes: number}) => Promise<void>;
@@ -74,10 +78,20 @@ function getResizeDurationMinutes(input: {
   return Math.max(TIMELINE_SLOT_MINUTES, input.initialDurationMinutes + deltaMinutes);
 }
 
+function focusDate(session: TaskExecutionSession): string {
+  return toIsoDate(new Date(session.startedAt));
+}
+
+function focusMinutes(session: TaskExecutionSession): number {
+  return Math.round((session.durationSeconds ?? 0) / 60);
+}
+
 export function WeekTimelineView({
   anchorDate,
   tasksByDate,
   categories,
+  focusSessions,
+  showFocusSessions,
   onScheduleTime,
   onMoveTimedTask,
   onResizeTimedTask,
@@ -194,6 +208,22 @@ export function WeekTimelineView({
                         });
                       }}
                     />
+                  </div>
+                ))}
+              {showFocusSessions && focusSessions
+                .filter((session) => focusDate(session) === day.isoDate)
+                .map((session) => ({session, block: buildFocusSessionBlock(session)}))
+                .filter(({block}) => Math.floor(block.topMinutes / 60) === hour)
+                .map(({session, block}) => (
+                  <div
+                    key={`focus-${session.id}`}
+                    className="mt-1 rounded border border-indigo-100 bg-indigo-50 px-2 py-1 text-[11px] font-bold text-indigo-600"
+                    style={{
+                      marginTop: `${Math.max(0, block.topMinutes - hour * 60)}px`,
+                      minHeight: `${Math.max(24, block.durationMinutes)}px`,
+                    }}
+                  >
+                    专注 {focusMinutes(session)}m
                   </div>
                 ))}
             </div>

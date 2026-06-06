@@ -254,4 +254,89 @@ describe('CalendarPanel', () => {
       allDay: false,
     }));
   });
+
+  it('renders focus records when enabled', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([
+      {
+        id: 1,
+        taskId: 1,
+        userId: 1,
+        startedAt: '2026-06-06T01:00:00.000Z',
+        durationSeconds: 2700,
+        status: 'COMPLETED',
+        createdAt: '',
+        taskTitle: '写方案',
+      },
+    ]);
+
+    render(
+      <CalendarPanel
+        categories={[]}
+        styleContext={{primary: '#fb7185', primaryLight: '#ffe4e6', secondary: '#fda4af'}}
+        showToast={vi.fn()}
+        initialDate="2026-06-06"
+      />,
+    );
+
+    expect(await screen.findByText('专注 45m')).toBeInTheDocument();
+  });
+
+  it('renders focus records in list view', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([
+      {
+        id: 1,
+        taskId: 1,
+        userId: 1,
+        startedAt: '2026-06-06T01:00:00.000Z',
+        durationSeconds: 1800,
+        status: 'COMPLETED',
+        createdAt: '',
+      },
+    ]);
+
+    render(
+      <CalendarPanel
+        categories={[]}
+        styleContext={{primary: '#fb7185', primaryLight: '#ffe4e6', secondary: '#fda4af'}}
+        showToast={vi.fn()}
+        initialDate="2026-06-06"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', {name: '列表'}));
+
+    expect(await screen.findByText('专注 30m')).toBeInTheDocument();
+  });
+
+  it('hides focus records when focus display is disabled', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([
+      {
+        id: 1,
+        taskId: 1,
+        userId: 1,
+        startedAt: '2026-06-06T01:00:00.000Z',
+        durationSeconds: 1800,
+        status: 'COMPLETED',
+        createdAt: '',
+      },
+    ]);
+
+    render(
+      <CalendarPanel
+        categories={[]}
+        styleContext={{primary: '#fb7185', primaryLight: '#ffe4e6', secondary: '#fda4af'}}
+        showToast={vi.fn()}
+        initialDate="2026-06-06"
+      />,
+    );
+
+    expect(await screen.findByText('专注 30m')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('显示设置'));
+    fireEvent.click(screen.getByLabelText('显示专注记录'));
+
+    expect(screen.queryByText('专注 30m')).not.toBeInTheDocument();
+  });
 });

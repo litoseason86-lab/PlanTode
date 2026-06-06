@@ -50,6 +50,8 @@ export function CalendarPanel({categories, styleContext, showToast, initialDate}
             anchorDate={controller.anchorDate}
             tasksByDate={controller.tasksByDate}
             categories={categories}
+            focusSessions={controller.focusSessions}
+            showFocusSessions={controller.settings.showFocusSessions}
             onScheduleTime={controller.scheduleTaskAtTime}
             onMoveTimedTask={controller.moveTimedTask}
             onResizeTimedTask={controller.resizeTimedTask}
@@ -61,6 +63,8 @@ export function CalendarPanel({categories, styleContext, showToast, initialDate}
             dateTo={controller.range.dateTo}
             tasksByDate={controller.tasksByDate}
             categories={categories}
+            focusSessions={controller.focusSessions}
+            showFocusSessions={controller.settings.showFocusSessions}
           />
         )}
       </div>
