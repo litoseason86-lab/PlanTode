@@ -129,10 +129,18 @@ export function buildAllDayQuickCreateDraft(input: {
 }): CalendarQuickCreateDraft {
   const plannedDate = input.startDate <= input.endDate ? input.startDate : input.endDate;
   const plannedEndDate = input.startDate <= input.endDate ? input.endDate : input.startDate;
+  if (plannedEndDate === plannedDate) {
+    return {
+      kind: 'all-day',
+      plannedDate,
+      anchor: input.anchor,
+    };
+  }
+
   return {
     kind: 'all-day',
     plannedDate,
-    plannedEndDate: plannedEndDate === plannedDate ? undefined : plannedEndDate,
+    plannedEndDate,
     anchor: input.anchor,
   };
 }

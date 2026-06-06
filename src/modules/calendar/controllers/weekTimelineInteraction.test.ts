@@ -118,16 +118,18 @@ describe('weekTimelineInteraction', () => {
   });
 
   it('omits plannedEndDate for one-day all-day drafts', () => {
-    expect(buildAllDayQuickCreateDraft({
+    const result = buildAllDayQuickCreateDraft({
       startDate: '2026-06-18',
       endDate: '2026-06-18',
       anchor: {x: 10, y: 20},
-    })).toEqual({
+    });
+
+    expect(result).toEqual({
       kind: 'all-day',
       plannedDate: '2026-06-18',
-      plannedEndDate: undefined,
       anchor: {x: 10, y: 20},
     });
+    expect(result).not.toHaveProperty('plannedEndDate');
   });
 
   it('calculates resize duration with hour-height-aware pixels', () => {
