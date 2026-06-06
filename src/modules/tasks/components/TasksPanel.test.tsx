@@ -5,6 +5,10 @@ import type {FormEvent} from 'react';
 import {readCalendarDragPayload} from '../../calendar/controllers/schedulingDrag';
 import {TasksPanel} from './TasksPanel';
 
+vi.mock('../../calendar/components/EmbeddedCalendarPanel', () => ({
+  EmbeddedCalendarPanel: () => <div data-testid="embedded-calendar" />,
+}));
+
 const baseCategories = [
   {
     id: 1,
@@ -238,5 +242,25 @@ describe('TasksPanel', () => {
     renderPanel();
     fireEvent.dragStart(screen.getByLabelText('拖拽任务 写周报'), {dataTransfer: data});
     expect(readCalendarDragPayload(data)).toEqual({type: 'calendar-task', taskId: 1, source: 'task-list'});
+  });
+
+  it('writes timed task drag payload with duration from the drag handle', () => {
+    const data = createDragData();
+    renderPanel({
+      filteredTaskItems: [{
+        ...baseTasks[0],
+        allDay: false,
+        startAt: '2026-06-05T09:15:00.000',
+        endAt: '2026-06-05T10:45:00.000',
+      }],
+    });
+
+    fireEvent.dragStart(screen.getByLabelText('拖拽任务 写周报'), {dataTransfer: data});
+
+    expect(readCalendarDragPayload(data)).toEqual({
+      type: 'calendar-timed-task',
+      taskId: 1,
+      durationMinutes: 90,
+    });
   });
 });

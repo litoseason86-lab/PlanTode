@@ -24,8 +24,11 @@ export function CalendarPanel({categories, styleContext, showToast, initialDate,
     initialDate,
     showToast,
     onMutationSuccess: async () => {
-      await onMutationSuccess?.();
-      setSidebarRefreshKey((key) => key + 1);
+      try {
+        await onMutationSuccess?.();
+      } finally {
+        setSidebarRefreshKey((key) => key + 1);
+      }
     },
   });
   const sidebarController = useSchedulingSidebarController({

@@ -1,7 +1,7 @@
 import {AppError} from '../../shared/errors/appError';
 import {TASK_STATUSES, type TaskStatus} from '../../../shared/domain/status';
 import {parseOptionalIsoDate} from '../../shared/http/dateParams';
-import {isLocalDateTimeString} from '../../../shared/lib/schedule';
+import {normalizeTaskSchedule, type NormalizedTaskSchedule} from './scheduleRules';
 
 type ScheduledFilter = 'unscheduled' | 'scheduled' | 'all-day-without-time';
 
@@ -19,13 +19,7 @@ export interface TaskStatusBody {
   status: TaskStatus;
 }
 
-export interface TaskScheduleBody {
-  plannedDate?: string;
-  plannedEndDate?: string;
-  startAt?: string;
-  endAt?: string;
-  allDay: boolean;
-}
+export interface TaskScheduleBody extends NormalizedTaskSchedule {}
 
 export interface TaskQueryParams {
   date?: string;
@@ -46,97 +40,12 @@ export interface BatchUnscheduleBody {
   taskIds: number[];
 }
 
-function parseOptionalLocalDateTime(value: unknown, fieldName: string): string | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (typeof value !== 'string' || !isLocalDateTimeString(value)) {
-    throw new AppError(400, `${fieldName} must be a local ISO datetime without timezone`);
-  }
-  return value;
-}
-
-function parseNullableIsoDate(value: unknown, fieldName: string): string | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  return parseOptionalIsoDate(value, fieldName);
-}
-
-function parseOptionalBoolean(value: unknown, fieldName: string): boolean | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value !== 'boolean') {
-    throw new AppError(400, `${fieldName} must be a boolean`);
-  }
-  return value;
-}
-
-function assertScheduleBodyRules(body: TaskScheduleBody): void {
-  if (!body.plannedDate) {
-    if (!body.allDay) {
-      throw new AppError(400, 'Timed task requires plannedDate');
-    }
-    return;
-  }
-  if (body.plannedEndDate && body.plannedEndDate < body.plannedDate) {
-    throw new AppError(400, 'plannedEndDate must be after plannedDate');
-  }
-  if (!body.allDay && (!body.startAt || !body.endAt)) {
-    throw new AppError(400, 'Timed task requires startAt and endAt');
-  }
-  if (body.startAt && body.endAt && body.endAt <= body.startAt) {
-    throw new AppError(400, 'endAt must be after startAt');
-  }
-  if (
-    !body.allDay &&
-    body.startAt?.slice(0, 10) !== body.plannedDate
-  ) {
-    throw new AppError(400, 'Timed task date must match plannedDate');
-  }
-  if (!body.allDay && body.endAt?.slice(0, 10) !== body.plannedDate) {
-    throw new AppError(400, 'Cross-day timed tasks are not supported yet');
-  }
-}
-
-function normalizeSchedulePayload(payload: Record<string, unknown>, requireAllDay: boolean): TaskScheduleBody {
-  const hasPlannedDateField = Object.prototype.hasOwnProperty.call(payload, 'plannedDate');
-  const hasScheduleDetails = [payload.plannedEndDate, payload.startAt, payload.endAt].some((value) => {
-    return value !== undefined && value !== null && value !== '';
-  });
-  const plannedDate = parseNullableIsoDate(payload.plannedDate, 'plannedDate');
-  const requestedAllDay = parseOptionalBoolean(payload.allDay, 'allDay');
-
-  if (!plannedDate) {
-    if (requestedAllDay === false || (!hasPlannedDateField && hasScheduleDetails)) {
-      throw new AppError(400, 'Timed task requires plannedDate');
-    }
-    return {
-      plannedDate: undefined,
-      plannedEndDate: undefined,
-      startAt: undefined,
-      endAt: undefined,
-      allDay: true,
-    };
-  }
-
-  const startAt = parseOptionalLocalDateTime(payload.startAt, 'startAt');
-  const endAt = parseOptionalLocalDateTime(payload.endAt, 'endAt');
-  const allDay = requestedAllDay ?? !(startAt && endAt);
-
-  if (requireAllDay && requestedAllDay === undefined) {
-    throw new AppError(400, 'allDay must be a boolean');
-  }
-
-  const schedule: TaskScheduleBody = {
-    plannedDate,
-    plannedEndDate: allDay ? parseOptionalIsoDate(payload.plannedEndDate, 'plannedEndDate') : undefined,
-    startAt: allDay ? undefined : startAt,
-    endAt: allDay ? undefined : endAt,
-    allDay,
-  };
-  assertScheduleBodyRules(schedule);
-  return schedule;
-}
-
 export function parseTaskId(value: string): number {
+  if (!/^[1-9]\d*$/.test(value)) {
+    throw new AppError(400, 'Invalid task ID');
+  }
   const id = Number.parseInt(value, 10);
-  if (Number.isNaN(id)) {
+  if (!Number.isSafeInteger(id)) {
     throw new AppError(400, 'Invalid task ID');
   }
   return id;
@@ -149,7 +58,10 @@ export function parseTaskBody(body: unknown): TaskBody {
     throw new AppError(400, 'Valid categoryId is required');
   }
 
-  const schedule = normalizeSchedulePayload(payload, false);
+  const schedule = normalizeTaskSchedule(payload, {
+    allowMissingPlannedDate: true,
+    requireAllDay: false,
+  });
   return {
     title: typeof payload.title === 'string' ? payload.title : '',
     categoryId,
@@ -213,7 +125,10 @@ export function parseTaskQuery(query: Record<string, unknown>): TaskQueryParams 
 }
 
 export function parseTaskScheduleBody(body: unknown): TaskScheduleBody {
-  return normalizeSchedulePayload((body ?? {}) as Record<string, unknown>, true);
+  return normalizeTaskSchedule((body ?? {}) as Record<string, unknown>, {
+    allowMissingPlannedDate: false,
+    requireAllDay: true,
+  });
 }
 
 function parseTaskIds(value: unknown): number[] {

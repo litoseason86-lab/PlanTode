@@ -58,6 +58,12 @@ export function useSchedulingSidebarController({
     batchUnscheduleRef.current = batchUnschedule;
   }, [batchScheduleDate, batchUnschedule, showToast]);
 
+  useEffect(() => {
+    setSelectedScheduleDate((current) => (
+      current >= dateFrom && current <= dateTo ? current : dateFrom
+    ));
+  }, [dateFrom, dateTo]);
+
   const refresh = useCallback(async () => {
     const refreshSeq = refreshSeqRef.current + 1;
     refreshSeqRef.current = refreshSeq;

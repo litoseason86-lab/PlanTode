@@ -9,6 +9,11 @@ import {filterTasks} from './useTasksController';
 
 type AppTab = 'today' | 'tasks' | 'categories' | 'calendar' | 'daily' | 'weekly' | 'focus';
 
+export interface CreateTaskScheduleOverride {
+  plannedDate?: string;
+  unscheduled?: boolean;
+}
+
 interface UseTaskActionsArgs {
   categories: Category[];
   allTasks: Task[];
@@ -64,7 +69,7 @@ export function useTaskActions({
     setTaskFormCategory((current) => current || categoryId);
   }
 
-  async function handleCreateTask(event?: FormEvent) {
+  async function handleCreateTask(event?: FormEvent, scheduleOverride?: CreateTaskScheduleOverride) {
     if (event) event.preventDefault();
     if (!taskFormTitle.trim()) {
       showToast('行动主题不能留空啦', 'error');
@@ -77,16 +82,18 @@ export function useTaskActions({
     }
 
     try {
+      const effectiveUnscheduled = scheduleOverride?.unscheduled ?? taskFormUnscheduled;
+      const effectivePlannedDate = scheduleOverride?.plannedDate ?? taskFormDate;
       setLoading(true);
       await tasksApi.createTask({
         title: taskFormTitle,
         categoryId: catId,
-        plannedDate: taskFormUnscheduled ? undefined : taskFormDate,
+        plannedDate: effectiveUnscheduled ? undefined : effectivePlannedDate,
       });
       showToast('任务已成功下派！');
       setTaskFormTitle('');
       await refreshAllTasks();
-      if (!taskFormUnscheduled && taskFormDate === selectedDate) {
+      if (!effectiveUnscheduled && effectivePlannedDate === selectedDate) {
         await loadTasksForSelectedDate();
       }
     } catch (err) {

@@ -283,7 +283,7 @@ describe('useCalendarController', () => {
     expect(onMutationSuccess).not.toHaveBeenCalled();
   });
 
-  it('shows an error toast when default time scheduling would cross midnight', async () => {
+  it('clamps default time scheduling near midnight to the same day', async () => {
     const showToast = vi.fn();
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
@@ -299,8 +299,13 @@ describe('useCalendarController', () => {
       await result.current.scheduleTaskAtTime({taskId: 1, date: '2026-06-06', hour: 23, minute: 30});
     });
 
-    expect(calendarApi.updateTaskSchedule).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith('Local datetime addition crossed day boundary', 'error');
+    expect(calendarApi.updateTaskSchedule).toHaveBeenCalledWith(1, expect.objectContaining({
+      plannedDate: '2026-06-06',
+      startAt: '2026-06-06T23:30:00.000',
+      endAt: '2026-06-06T23:59:00.000',
+      allDay: false,
+    }));
+    expect(showToast).not.toHaveBeenCalledWith('Local datetime addition crossed day boundary', 'error');
   });
 
   it('shows an error toast when schedule update fails', async () => {

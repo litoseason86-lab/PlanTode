@@ -4,6 +4,7 @@ import {
   parseBatchScheduleBody,
   parseBatchUnscheduleBody,
   parseTaskBody,
+  parseTaskId,
   parseTaskQuery,
   parseTaskScheduleBody,
 } from './schemas';
@@ -107,14 +108,11 @@ describe('task schemas', () => {
     });
   });
 
-  it('parses null plannedDate as unscheduled', () => {
+  it('parses null plannedDate without schedule details as unscheduled', () => {
     expect(parseTaskBody({
       title: '收集资料',
       categoryId: 1,
       plannedDate: null,
-      plannedEndDate: '2026-06-08',
-      startAt: '2026-06-06T09:00:00.000',
-      endAt: '2026-06-06T10:00:00.000',
     })).toMatchObject({
       plannedDate: undefined,
       plannedEndDate: undefined,
@@ -124,70 +122,106 @@ describe('task schemas', () => {
     });
   });
 
-it('rejects null plannedDate when the caller explicitly requests a timed task', () => {
-  expect(() => parseTaskBody({
-    title: '收集资料',
+  it('rejects null plannedDate when task creation includes schedule details', () => {
+    expect(() => parseTaskBody({
+      title: '收集资料',
+      categoryId: 1,
+      plannedDate: null,
+      plannedEndDate: '2026-06-08',
+    })).toThrow('Timed task requires plannedDate');
+    expect(() => parseTaskBody({
+      title: '收集资料',
       categoryId: 1,
       plannedDate: null,
       startAt: '2026-06-06T09:00:00.000',
       endAt: '2026-06-06T10:00:00.000',
-    allDay: false,
-  })).toThrow('Timed task requires plannedDate');
-});
-
-it('rejects omitted plannedDate when schedule details are present', () => {
-  expect(() => parseTaskBody({
-    title: '收集资料',
-    categoryId: 1,
-    startAt: '2026-06-06T09:00:00.000',
-    endAt: '2026-06-06T10:00:00.000',
-  })).toThrow('Timed task requires plannedDate');
-});
-
-  it('parses empty schedule update body as unscheduled', () => {
-    expect(parseTaskScheduleBody({})).toEqual({
-      plannedDate: undefined,
-      plannedEndDate: undefined,
-      startAt: undefined,
-      endAt: undefined,
-      allDay: true,
-    });
+    })).toThrow('Timed task requires plannedDate');
   });
 
-  it('parses null plannedDate schedule update as unscheduled', () => {
-    expect(parseTaskScheduleBody({plannedDate: null})).toEqual({
-      plannedDate: undefined,
-      plannedEndDate: undefined,
-      startAt: undefined,
-      endAt: undefined,
-      allDay: true,
-    });
-  });
-
-  it('parses schedule update without plannedDate as unscheduled', () => {
-    expect(parseTaskScheduleBody({allDay: true})).toEqual({
-      plannedDate: undefined,
-      plannedEndDate: undefined,
-      startAt: undefined,
-      endAt: undefined,
-      allDay: true,
-    });
-  });
-
-it('rejects timed schedule updates without plannedDate', () => {
-  expect(() => parseTaskScheduleBody({
-    startAt: '2026-06-06T09:00:00.000',
+  it('rejects null plannedDate when the caller explicitly requests a timed task', () => {
+    expect(() => parseTaskBody({
+      title: '收集资料',
+      categoryId: 1,
+      plannedDate: null,
+      startAt: '2026-06-06T09:00:00.000',
       endAt: '2026-06-06T10:00:00.000',
-    allDay: false,
-  })).toThrow('Timed task requires plannedDate');
-});
+      allDay: false,
+    })).toThrow('Timed task requires plannedDate');
+  });
 
-it('rejects schedule updates without plannedDate when schedule details are present', () => {
-  expect(() => parseTaskScheduleBody({
-    startAt: '2026-06-06T09:00:00.000',
-    endAt: '2026-06-06T10:00:00.000',
-  })).toThrow('Timed task requires plannedDate');
-});
+  it('rejects omitted plannedDate when task creation includes schedule details', () => {
+    expect(() => parseTaskBody({
+      title: '收集资料',
+      categoryId: 1,
+      plannedEndDate: '2026-06-08',
+    })).toThrow('Timed task requires plannedDate');
+    expect(() => parseTaskBody({
+      title: '收集资料',
+      categoryId: 1,
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+    })).toThrow('Timed task requires plannedDate');
+  });
+
+  it('rejects empty schedule update body', () => {
+    expect(() => parseTaskScheduleBody({})).toThrow(
+      'Schedule update requires plannedDate or explicit plannedDate null',
+    );
+  });
+
+  it('parses explicit null plannedDate schedule update as unscheduled', () => {
+    expect(parseTaskScheduleBody({plannedDate: null, allDay: true})).toEqual({
+      plannedDate: undefined,
+      plannedEndDate: undefined,
+      startAt: undefined,
+      endAt: undefined,
+      allDay: true,
+    });
+  });
+
+  it('rejects schedule update without plannedDate', () => {
+    expect(() => parseTaskScheduleBody({allDay: true})).toThrow(
+      'Schedule update requires plannedDate or explicit plannedDate null',
+    );
+  });
+
+  it('rejects timed schedule updates without plannedDate', () => {
+    expect(() => parseTaskScheduleBody({
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+      allDay: false,
+    })).toThrow('Timed task requires plannedDate');
+  });
+
+  it('rejects schedule updates without plannedDate when schedule details are present', () => {
+    expect(() => parseTaskScheduleBody({
+      plannedEndDate: '2026-06-08',
+    })).toThrow('Timed task requires plannedDate');
+    expect(() => parseTaskScheduleBody({
+      startAt: '2026-06-06T09:00:00.000',
+    })).toThrow('Timed task requires plannedDate');
+    expect(() => parseTaskScheduleBody({
+      endAt: '2026-06-06T10:00:00.000',
+    })).toThrow('Timed task requires plannedDate');
+  });
+
+  it('rejects schedule updates with null plannedDate when schedule details are present', () => {
+    expect(() => parseTaskScheduleBody({
+      plannedDate: null,
+      plannedEndDate: '2026-06-08',
+      allDay: true,
+    })).toThrow('Timed task requires plannedDate');
+    expect(() => parseTaskScheduleBody({
+      plannedDate: null,
+      startAt: '2026-06-06T09:00:00.000',
+      allDay: true,
+    })).toThrow('Timed task requires plannedDate');
+    expect(() => parseTaskScheduleBody({
+      plannedDate: null,
+      endAt: '2026-06-06T10:00:00.000',
+      allDay: true,
+    })).toThrow('Timed task requires plannedDate');
+  });
 
   it('rejects cross-day timed task schedule body', () => {
     expect(() => parseTaskScheduleBody({
@@ -234,5 +268,16 @@ it('rejects schedule updates without plannedDate when schedule details are prese
   it('rejects non-integer batch task ids', () => {
     expect(() => parseBatchUnscheduleBody({taskIds: ['1abc']})).toThrow('taskIds must contain positive integers');
     expect(() => parseBatchUnscheduleBody({taskIds: ['1.9']})).toThrow('taskIds must contain positive integers');
+  });
+
+  it('parses task ids only from positive integer strings', () => {
+    expect(parseTaskId('1')).toBe(1);
+    expect(parseTaskId('42')).toBe(42);
+    expect(() => parseTaskId('1abc')).toThrow('Invalid task ID');
+    expect(() => parseTaskId('1.9')).toThrow('Invalid task ID');
+    expect(() => parseTaskId('0')).toThrow('Invalid task ID');
+    expect(() => parseTaskId('-1')).toThrow('Invalid task ID');
+    expect(() => parseTaskId('')).toThrow('Invalid task ID');
+    expect(() => parseTaskId('9007199254740993')).toThrow('Invalid task ID');
   });
 });

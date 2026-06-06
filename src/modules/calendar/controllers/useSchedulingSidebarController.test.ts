@@ -66,4 +66,32 @@ describe('useSchedulingSidebarController', () => {
     await act(async () => result.current.batchScheduleSelected('2026-06-08'));
     expect(result.current.selectedTaskIds.has(1)).toBe(true);
   });
+
+  it('resets the selected schedule date to the new range start when the selected date leaves the range', async () => {
+    vi.mocked(calendarApi.getUnscheduledTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getAllDayWithoutTimeTasks).mockResolvedValue([]);
+    const {result, rerender} = renderHook(
+      ({range}) => useSchedulingSidebarController(baseArgs({range})),
+      {initialProps: {range: {dateFrom: '2026-06-01', dateTo: '2026-06-07'}}},
+    );
+
+    act(() => result.current.setSelectedScheduleDate('2026-06-05'));
+    rerender({range: {dateFrom: '2026-06-08', dateTo: '2026-06-14'}});
+
+    await waitFor(() => expect(result.current.selectedScheduleDate).toBe('2026-06-08'));
+  });
+
+  it('keeps the selected schedule date when a range change still contains it', async () => {
+    vi.mocked(calendarApi.getUnscheduledTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getAllDayWithoutTimeTasks).mockResolvedValue([]);
+    const {result, rerender} = renderHook(
+      ({range}) => useSchedulingSidebarController(baseArgs({range})),
+      {initialProps: {range: {dateFrom: '2026-06-01', dateTo: '2026-06-07'}}},
+    );
+
+    act(() => result.current.setSelectedScheduleDate('2026-06-05'));
+    rerender({range: {dateFrom: '2026-06-01', dateTo: '2026-06-30'}});
+
+    await waitFor(() => expect(result.current.selectedScheduleDate).toBe('2026-06-05'));
+  });
 });

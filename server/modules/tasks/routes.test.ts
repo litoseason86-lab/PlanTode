@@ -72,10 +72,19 @@ describe('task routes', () => {
     expect(service.updateSchedule).not.toHaveBeenCalled();
   });
 
-  it('routes single-task empty schedule body as unschedule', async () => {
+  it('rejects single-task empty schedule body', async () => {
     const service = buildService();
 
     const response = await request(service, '/api/tasks/1/schedule', {});
+
+    expect(response.status).toBe(400);
+    expect(service.updateSchedule).not.toHaveBeenCalled();
+  });
+
+  it('routes explicit null plannedDate schedule body as unschedule', async () => {
+    const service = buildService();
+
+    const response = await request(service, '/api/tasks/1/schedule', {plannedDate: null, allDay: true});
 
     expect(response.status).toBe(200);
     expect(service.updateSchedule).toHaveBeenCalledWith({
@@ -87,5 +96,17 @@ describe('task routes', () => {
       endAt: undefined,
       allDay: true,
     });
+  });
+
+  it('rejects invalid single-task ids before schedule updates', async () => {
+    const service = buildService();
+
+    const response = await request(service, '/api/tasks/1abc/schedule', {
+      plannedDate: null,
+      allDay: true,
+    });
+
+    expect(response.status).toBe(400);
+    expect(service.updateSchedule).not.toHaveBeenCalled();
   });
 });

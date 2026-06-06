@@ -5,6 +5,7 @@ import {Bar, BarChart, Cell, ResponsiveContainer} from 'recharts';
 
 import type {Category, Task, TaskExecutionSession} from '../../../../shared/domain/entities';
 import type {TaskStatus} from '../../../../shared/domain/status';
+import type {CreateTaskScheduleOverride} from '../../tasks/controllers/useTaskActions';
 
 interface DashboardPanelProps {
   styleContext: {
@@ -25,7 +26,7 @@ interface DashboardPanelProps {
   taskFormCategory: number;
   setTaskFormTitle: (value: string) => void;
   setTaskFormCategory: (value: number) => void;
-  handleCreateTask: (event?: React.FormEvent) => void;
+  handleCreateTask: (event?: React.FormEvent, scheduleOverride?: CreateTaskScheduleOverride) => void;
   handleUpdateTaskStatus: (id: number, status: TaskStatus) => void;
   handleStartSession: (task: Task) => void;
   handleStopSession: () => void;
@@ -157,7 +158,7 @@ export function DashboardPanel({
           onChange={(event) => setTaskFormTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
-              handleCreateTask();
+              handleCreateTask(undefined, {plannedDate: selectedDate, unscheduled: false});
             }
           }}
           className="flex-1 text-sm border border-slate-200 bg-slate-50/50 p-2.5 rounded-xl outline-none focus:border-[var(--color-primary)] focus:bg-white focus:shadow-sm font-semibold transition-all text-slate-800 placeholder:text-slate-300"
@@ -175,7 +176,7 @@ export function DashboardPanel({
           </select>
 
           <button
-            onClick={() => handleCreateTask()}
+            onClick={() => handleCreateTask(undefined, {plannedDate: selectedDate, unscheduled: false})}
             className="text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-[var(--color-primary)]/20 hover:shadow-md hover:scale-[1.02] flex items-center gap-1.5 cursor-pointer active:scale-[0.98]"
             style={{backgroundColor: styleContext.primary}}
           >

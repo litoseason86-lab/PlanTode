@@ -1,10 +1,25 @@
 import {addMinutesToLocalDateTime, makeLocalDateTime} from '../../../../shared/lib/schedule';
 import {calendarApi} from '../api/calendarApi';
 
+const DEFAULT_TIMED_TASK_DURATION_MINUTES = 60;
+const MIN_TIMED_TASK_DURATION_MINUTES = 15;
+
 interface UseTaskSchedulingActionsArgs {
   showToast: (message: string, type?: 'success' | 'error') => void;
   refreshCalendarData: () => Promise<void>;
   onMutationSuccess?: () => Promise<void> | void;
+}
+
+function defaultTimedTaskEndAt(date: string, hour: number, minute: number): string {
+  const startMinutes = hour * 60 + minute;
+  const remainingWholeMinutes = 24 * 60 - 1 - startMinutes;
+  const clampedDurationMinutes = Math.max(
+    MIN_TIMED_TASK_DURATION_MINUTES,
+    Math.min(DEFAULT_TIMED_TASK_DURATION_MINUTES, remainingWholeMinutes),
+  );
+  const endMinutes = Math.min(24 * 60 - 1, startMinutes + clampedDurationMinutes);
+
+  return makeLocalDateTime(date, Math.floor(endMinutes / 60), endMinutes % 60);
 }
 
 export function useTaskSchedulingActions({
@@ -15,13 +30,22 @@ export function useTaskSchedulingActions({
   async function persistMutation(action: () => Promise<unknown>, fallbackMessage: string): Promise<boolean> {
     try {
       await action();
-      await refreshCalendarData();
-      await onMutationSuccess?.();
-      return true;
     } catch (error) {
       showToast(error instanceof Error ? error.message : fallbackMessage, 'error');
       return false;
     }
+
+    try {
+      await refreshCalendarData();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+    }
+    try {
+      await onMutationSuccess?.();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+    }
+    return true;
   }
 
   async function scheduleDate(input: {taskId: number; date: string}): Promise<boolean> {
@@ -37,7 +61,7 @@ export function useTaskSchedulingActions({
   async function scheduleTime(input: {taskId: number; date: string; hour: number; minute: number}): Promise<boolean> {
     return persistMutation(() => {
       const startAt = makeLocalDateTime(input.date, input.hour, input.minute);
-      const endAt = addMinutesToLocalDateTime(startAt, 60);
+      const endAt = defaultTimedTaskEndAt(input.date, input.hour, input.minute);
       return calendarApi.updateTaskSchedule(input.taskId, {
         plannedDate: input.date,
         plannedEndDate: undefined,

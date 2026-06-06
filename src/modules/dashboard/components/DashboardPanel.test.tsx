@@ -30,7 +30,7 @@ const tasks = [
 ];
 
 describe('DashboardPanel', () => {
-  it('submits quick task creation and shows dashboard title', () => {
+  it('submits quick task creation for the selected date and shows dashboard title', () => {
     const onCreateTask = vi.fn();
 
     render(
@@ -60,6 +60,9 @@ describe('DashboardPanel', () => {
 
     fireEvent.click(screen.getByRole('button', {name: /快速派遣/i}));
 
-    expect(onCreateTask).toHaveBeenCalledOnce();
+    expect(onCreateTask).toHaveBeenCalledWith(undefined, {
+      plannedDate: '2026-06-05',
+      unscheduled: false,
+    });
   });
 });

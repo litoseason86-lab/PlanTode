@@ -61,4 +61,82 @@ describe('useTaskSchedulingActions', () => {
     expect(refreshCalendarData).not.toHaveBeenCalled();
     expect(onMutationSuccess).not.toHaveBeenCalled();
   });
+
+  it('clamps default timed scheduling duration to the remaining minutes in the same day', async () => {
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
+    const {result} = renderHook(() => useTaskSchedulingActions({
+      showToast: vi.fn(),
+      refreshCalendarData: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    await expect(result.current.scheduleTime({
+      taskId: 1,
+      date: '2026-06-06',
+      hour: 23,
+      minute: 30,
+    })).resolves.toBe(true);
+
+    expect(calendarApi.updateTaskSchedule).toHaveBeenCalledWith(1, {
+      plannedDate: '2026-06-06',
+      plannedEndDate: undefined,
+      startAt: '2026-06-06T23:30:00.000',
+      endAt: '2026-06-06T23:59:00.000',
+      allDay: false,
+    });
+  });
+
+  it('uses the minimum same-day end time for the last quarter-hour slot', async () => {
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
+    const {result} = renderHook(() => useTaskSchedulingActions({
+      showToast: vi.fn(),
+      refreshCalendarData: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    await expect(result.current.scheduleTime({
+      taskId: 1,
+      date: '2026-06-06',
+      hour: 23,
+      minute: 45,
+    })).resolves.toBe(true);
+
+    expect(calendarApi.updateTaskSchedule).toHaveBeenCalledWith(1, {
+      plannedDate: '2026-06-06',
+      plannedEndDate: undefined,
+      startAt: '2026-06-06T23:45:00.000',
+      endAt: '2026-06-06T23:59:00.000',
+      allDay: false,
+    });
+  });
+
+  it('returns true when refresh fails after a successful mutation', async () => {
+    const showToast = vi.fn();
+    const refreshCalendarData = vi.fn().mockRejectedValue(new Error('刷新失败'));
+    const onMutationSuccess = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
+    const {result} = renderHook(() => useTaskSchedulingActions({
+      showToast,
+      refreshCalendarData,
+      onMutationSuccess,
+    }));
+
+    await expect(result.current.scheduleDate({taskId: 1, date: '2026-06-08'})).resolves.toBe(true);
+    expect(showToast).toHaveBeenCalledWith('刷新失败', 'error');
+    expect(onMutationSuccess).toHaveBeenCalledOnce();
+  });
+
+  it('returns true when success callback fails after a successful mutation', async () => {
+    const showToast = vi.fn();
+    const refreshCalendarData = vi.fn().mockResolvedValue(undefined);
+    const onMutationSuccess = vi.fn().mockRejectedValue(new Error('同步失败'));
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
+    const {result} = renderHook(() => useTaskSchedulingActions({
+      showToast,
+      refreshCalendarData,
+      onMutationSuccess,
+    }));
+
+    await expect(result.current.scheduleDate({taskId: 1, date: '2026-06-08'})).resolves.toBe(true);
+    expect(refreshCalendarData).toHaveBeenCalledOnce();
+    expect(showToast).toHaveBeenCalledWith('同步失败', 'error');
+  });
 });

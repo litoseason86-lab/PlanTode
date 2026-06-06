@@ -153,6 +153,28 @@ describe('TasksService', () => {
     })).toThrow('endAt must be after startAt');
   });
 
+  it('infers timed task creation through the service when start and end are provided', () => {
+    const repository = buildTaskRepository();
+    const service = buildService(repository);
+
+    service.create({
+      userId: 1,
+      categoryId: 1,
+      title: '会议',
+      plannedDate: '2026-06-06',
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+    });
+
+    expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({
+      plannedDate: '2026-06-06',
+      plannedEndDate: undefined,
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+      allDay: false,
+    }));
+  });
+
   it('creates unscheduled tasks after category validation', () => {
     const repository = buildTaskRepository();
     const service = buildService(repository);
@@ -175,6 +197,21 @@ describe('TasksService', () => {
     }));
   });
 
+  it('rejects task creation without plannedDate when plannedEndDate is present', () => {
+    const repository = buildTaskRepository();
+    const service = buildService(repository);
+
+    expect(() => service.create({
+      userId: 1,
+      categoryId: 1,
+      title: '缺日期的结束日期',
+      plannedDate: undefined,
+      plannedEndDate: '2026-06-08',
+      allDay: true,
+    })).toThrow('Timed task requires plannedDate');
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
   it('rejects task creation with schedule details but no plannedDate', () => {
     const repository = buildTaskRepository();
     const service = buildService(repository);
@@ -188,6 +225,22 @@ describe('TasksService', () => {
       endAt: '2026-06-06T10:00:00.000',
     })).toThrow('Timed task requires plannedDate');
     expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects schedule updates without plannedDate when plannedEndDate is present', () => {
+    const repository = buildTaskRepository({
+      getById: vi.fn(() => existingTask(1)),
+    });
+    const service = buildService(repository);
+
+    expect(() => service.updateSchedule({
+      taskId: 1,
+      userId: 1,
+      plannedDate: undefined,
+      plannedEndDate: '2026-06-08',
+      allDay: true,
+    })).toThrow('Timed task requires plannedDate');
+    expect(repository.updateSchedule).not.toHaveBeenCalled();
   });
 
   it('unschedules a task through schedule update', () => {

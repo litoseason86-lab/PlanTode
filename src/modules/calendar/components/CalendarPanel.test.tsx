@@ -126,6 +126,30 @@ describe('CalendarPanel', () => {
     await waitFor(() => expect(onMutationSuccess).toHaveBeenCalledOnce());
   });
 
+  it('refreshes the scheduling sidebar even when app-level mutation refresh fails', async () => {
+    const onMutationSuccess = vi.fn().mockRejectedValue(new Error('外层刷新失败'));
+    const showToast = vi.fn();
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 10} as never);
+    vi.mocked(calendarApi.getUnscheduledTasks)
+      .mockResolvedValueOnce([
+        {id: 10, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+      ] as never)
+      .mockResolvedValueOnce([] as never);
+    vi.mocked(calendarApi.getAllDayWithoutTimeTasks).mockResolvedValue([] as never);
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+
+    renderCalendarPanel({onMutationSuccess, showToast});
+    const data = createDragData();
+    fireEvent.dragStart(await screen.findByLabelText('拖拽 未安排任务'), {dataTransfer: data});
+    fireEvent.drop(screen.getByLabelText('2026-06-06 全天'), {dataTransfer: data});
+
+    await waitFor(() => expect(onMutationSuccess).toHaveBeenCalledOnce());
+    await waitFor(() => expect(calendarApi.getUnscheduledTasks).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText('未安排任务')).not.toBeInTheDocument());
+    expect(showToast).toHaveBeenCalledWith('外层刷新失败', 'error');
+  });
+
   it('renders month tasks', async () => {
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([
       {id: 1, userId: 1, categoryId: 1, title: '写方案', plannedDate: '2026-06-06', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},

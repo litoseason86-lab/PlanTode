@@ -9,7 +9,7 @@ import type {
   UpdateTaskScheduleInput,
 } from './repository';
 import {TASK_STATUSES, type TaskStatus} from '../../../shared/domain/status';
-import {isIsoDateString} from '../../../shared/lib/date';
+import {normalizeTaskSchedule, type TaskScheduleRuleInput} from './scheduleRules';
 
 interface TaskListFilters {
   userId: number;
@@ -42,61 +42,15 @@ export class TasksService {
     });
   }
 
-  private normalizeSchedule(input: UpdateTaskScheduleInput): UpdateTaskScheduleInput {
-    if (!input.plannedDate) {
-      return {
-        taskId: input.taskId,
-        userId: input.userId,
-        plannedDate: undefined,
-        plannedEndDate: undefined,
-        startAt: undefined,
-        endAt: undefined,
-        allDay: true,
-      };
-    }
-
-    if (input.allDay) {
-      return {
-        ...input,
-        plannedEndDate: input.plannedEndDate,
-        startAt: undefined,
-        endAt: undefined,
-        allDay: true,
-      };
-    }
-
+  private normalizeSchedule(input: {taskId: number; userId: number} & TaskScheduleRuleInput): UpdateTaskScheduleInput {
     return {
-      ...input,
-      plannedEndDate: undefined,
-      allDay: false,
+      taskId: input.taskId,
+      userId: input.userId,
+      ...normalizeTaskSchedule(input, {
+        allowMissingPlannedDate: true,
+        requireAllDay: false,
+      }),
     };
-  }
-
-  private validateSchedule(input: UpdateTaskScheduleInput): void {
-    if (!input.plannedDate) {
-      if (!input.allDay || input.plannedEndDate || input.startAt || input.endAt) {
-        throw new AppError(400, 'Timed task requires plannedDate');
-      }
-      return;
-    }
-    if (!isIsoDateString(input.plannedDate)) {
-      throw new AppError(400, 'Invalid plannedDate');
-    }
-    if (input.plannedEndDate && input.plannedEndDate < input.plannedDate) {
-      throw new AppError(400, 'plannedEndDate must be after plannedDate');
-    }
-    if (!input.allDay && (!input.startAt || !input.endAt)) {
-      throw new AppError(400, 'Timed task requires startAt and endAt');
-    }
-    if (input.startAt && input.endAt && input.endAt <= input.startAt) {
-      throw new AppError(400, 'endAt must be after startAt');
-    }
-    if (!input.allDay && input.startAt?.slice(0, 10) !== input.plannedDate) {
-      throw new AppError(400, 'Timed task date must match plannedDate');
-    }
-    if (!input.allDay && input.endAt?.slice(0, 10) !== input.plannedDate) {
-      throw new AppError(400, 'Cross-day timed tasks are not supported yet');
-    }
   }
 
   private assertPositiveTaskIds(taskIds: number[]): void {
@@ -140,9 +94,8 @@ export class TasksService {
       plannedEndDate: input.plannedEndDate,
       startAt: input.startAt,
       endAt: input.endAt,
-      allDay: input.allDay ?? true,
+      allDay: input.allDay,
     };
-    this.validateSchedule(scheduleInput);
     const normalizedSchedule = this.normalizeSchedule(scheduleInput);
 
     return this.tasks.create({
@@ -162,7 +115,6 @@ export class TasksService {
       throw new AppError(404, 'Task not found');
     }
 
-    this.validateSchedule(input);
     const updated = this.tasks.updateSchedule(this.normalizeSchedule(input));
     if (!updated) {
       throw new AppError(404, 'Task not found');
@@ -219,7 +171,6 @@ export class TasksService {
         endAt: undefined,
         allDay: true,
       });
-      this.validateSchedule(update);
       return update;
     });
 
