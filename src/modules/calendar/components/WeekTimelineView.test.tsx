@@ -226,6 +226,24 @@ describe('WeekTimelineView', () => {
     }));
   });
 
+  it('hides resize handle when a timed task cannot end 15 minutes later on the same day', () => {
+    renderWeek({
+      tasksByDate: {
+        '2026-06-06': [{
+          ...task,
+          id: 2,
+          title: '临界时间任务',
+          plannedDate: '2026-06-06',
+          allDay: false,
+          startAt: '2026-06-06T23:45:00.000',
+          endAt: '2026-06-06T23:59:00.000',
+        }],
+      },
+    });
+
+    expect(screen.queryByLabelText('调整临界时间任务时长')).not.toBeInTheDocument();
+  });
+
   it('renders duplicated cross-day all-day tasks as one continuous segment', () => {
     const crossDayTask = {
       ...task,
