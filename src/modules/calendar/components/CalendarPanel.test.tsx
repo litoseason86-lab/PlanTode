@@ -134,4 +134,78 @@ describe('CalendarPanel', () => {
       allDay: true,
     }));
   });
+
+  it('drops an all-day task onto the week timeline', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([
+      {id: 1, userId: 1, categoryId: 1, title: '安排会议', plannedDate: '2026-06-06', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+    ]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
+
+    render(
+      <CalendarPanel
+        categories={[{id: 1, userId: 1, name: '工作', color: '#ef4444', sortOrder: 1, createdAt: '', updatedAt: ''}]}
+        styleContext={{primary: '#fb7185', primaryLight: '#ffe4e6', secondary: '#fda4af'}}
+        showToast={vi.fn()}
+        initialDate="2026-06-06"
+      />,
+    );
+
+    const task = await screen.findByText('安排会议');
+    const target = screen.getByLabelText('2026-06-06 09:00');
+    const data = createDragData();
+
+    fireEvent.dragStart(task, {dataTransfer: data});
+    fireEvent.drop(target, {dataTransfer: data});
+
+    expect(calendarApi.updateTaskSchedule).toHaveBeenCalledWith(1, expect.objectContaining({
+      plannedDate: '2026-06-06',
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+      allDay: false,
+    }));
+  });
+
+  it('moves a timed task on the week timeline while preserving duration', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([
+      {
+        id: 1,
+        userId: 1,
+        categoryId: 1,
+        title: '时间段任务',
+        plannedDate: '2026-06-06',
+        allDay: false,
+        startAt: '2026-06-06T09:00:00.000',
+        endAt: '2026-06-06T10:30:00.000',
+        status: 'TODO',
+        createdAt: '',
+        updatedAt: '',
+      },
+    ]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
+
+    render(
+      <CalendarPanel
+        categories={[{id: 1, userId: 1, name: '工作', color: '#ef4444', sortOrder: 1, createdAt: '', updatedAt: ''}]}
+        styleContext={{primary: '#fb7185', primaryLight: '#ffe4e6', secondary: '#fda4af'}}
+        showToast={vi.fn()}
+        initialDate="2026-06-06"
+      />,
+    );
+
+    const task = await screen.findByText('09:00 时间段任务');
+    const target = screen.getByLabelText('2026-06-07 14:00');
+    const data = createDragData();
+
+    fireEvent.dragStart(task, {dataTransfer: data});
+    fireEvent.drop(target, {dataTransfer: data});
+
+    expect(calendarApi.updateTaskSchedule).toHaveBeenCalledWith(1, expect.objectContaining({
+      plannedDate: '2026-06-07',
+      startAt: '2026-06-07T14:00:00.000',
+      endAt: '2026-06-07T15:30:00.000',
+      allDay: false,
+    }));
+  });
 });

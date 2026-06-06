@@ -1,19 +1,61 @@
 import type {Category, Task} from '../../../../shared/domain/entities';
 import {buildWeekDays} from '../controllers/calendarLayout';
+import {TIMELINE_END_HOUR, TIMELINE_START_HOUR, buildTimedTaskBlock} from '../controllers/weekTimelineLayout';
 
-const HOURS = Array.from({length: 18}, (_, index) => index + 6);
+const HOURS = Array.from({length: TIMELINE_END_HOUR - TIMELINE_START_HOUR + 1}, (_, index) => index + TIMELINE_START_HOUR);
 
 interface WeekTimelineViewProps {
   anchorDate: string;
   tasksByDate: Record<string, Task[]>;
   categories: Category[];
+  onScheduleTime: (input: {taskId: number; date: string; hour: number; minute: number}) => Promise<void>;
+  onMoveTimedTask: (input: {taskId: number; date: string; hour: number; minute: number; durationMinutes: number}) => Promise<void>;
 }
 
 function categoryColor(categories: Category[], categoryId: number): string {
   return categories.find((category) => category.id === categoryId)?.color ?? '#64748b';
 }
 
-export function WeekTimelineView({anchorDate, tasksByDate, categories}: WeekTimelineViewProps) {
+function readDragPayload(event: React.DragEvent): {taskId: number; durationMinutes?: number} | undefined {
+  const raw = event.dataTransfer.getData('application/json') || event.dataTransfer.getData('text/plain');
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    const payload = raw.startsWith('{')
+      ? JSON.parse(raw) as {taskId?: unknown; durationMinutes?: unknown}
+      : {taskId: Number(raw)};
+    if (typeof payload.taskId !== 'number' || !Number.isFinite(payload.taskId)) {
+      return undefined;
+    }
+    return typeof payload.durationMinutes === 'number' && Number.isFinite(payload.durationMinutes)
+      ? {taskId: payload.taskId, durationMinutes: payload.durationMinutes}
+      : {taskId: payload.taskId};
+  } catch {
+    return undefined;
+  }
+}
+
+function writeDragPayload(event: React.DragEvent, payload: {taskId: number; durationMinutes?: number}) {
+  event.dataTransfer.setData('application/json', JSON.stringify(payload));
+  event.dataTransfer.setData('text/plain', String(payload.taskId));
+}
+
+function taskDurationMinutes(task: Task): number | undefined {
+  if (!task.startAt || !task.endAt) {
+    return undefined;
+  }
+  return buildTimedTaskBlock({startAt: task.startAt, endAt: task.endAt}).durationMinutes;
+}
+
+export function WeekTimelineView({
+  anchorDate,
+  tasksByDate,
+  categories,
+  onScheduleTime,
+  onMoveTimedTask,
+}: WeekTimelineViewProps) {
   const days = buildWeekDays(anchorDate);
 
   return (
@@ -24,7 +66,13 @@ export function WeekTimelineView({anchorDate, tasksByDate, categories}: WeekTime
           <div key={day.isoDate} className="min-h-20 border-l border-slate-100 p-2">
             <div className="mb-2 text-xs font-bold text-slate-500">{day.isoDate.slice(5)}</div>
             {(tasksByDate[day.isoDate] ?? []).filter((task) => task.allDay).map((task) => (
-              <div key={task.id} className="mb-1 truncate rounded px-2 py-1 text-[11px] font-bold text-white" style={{backgroundColor: categoryColor(categories, task.categoryId)}}>
+              <div
+                key={task.id}
+                draggable
+                onDragStart={(event) => writeDragPayload(event, {taskId: task.id})}
+                className="mb-1 truncate rounded px-2 py-1 text-[11px] font-bold text-white"
+                style={{backgroundColor: categoryColor(categories, task.categoryId)}}
+              >
                 {task.title}
               </div>
             ))}
@@ -35,11 +83,43 @@ export function WeekTimelineView({anchorDate, tasksByDate, categories}: WeekTime
         <div key={hour} className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-slate-100">
           <div className="p-2 text-xs font-semibold text-slate-400">{String(hour).padStart(2, '0')}:00</div>
           {days.map((day) => (
-            <div key={`${day.isoDate}-${hour}`} className="min-h-12 border-l border-slate-100 p-1">
+            <div
+              key={`${day.isoDate}-${hour}`}
+              aria-label={`${day.isoDate} ${String(hour).padStart(2, '0')}:00`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                const payload = readDragPayload(event);
+                if (!payload?.taskId) {
+                  return;
+                }
+                if (payload.durationMinutes) {
+                  void onMoveTimedTask({
+                    taskId: payload.taskId,
+                    date: day.isoDate,
+                    hour,
+                    minute: 0,
+                    durationMinutes: payload.durationMinutes,
+                  });
+                  return;
+                }
+                void onScheduleTime({taskId: payload.taskId, date: day.isoDate, hour, minute: 0});
+              }}
+              className="min-h-12 border-l border-slate-100 p-1"
+            >
               {(tasksByDate[day.isoDate] ?? [])
                 .filter((task) => !task.allDay && task.startAt?.slice(11, 13) === String(hour).padStart(2, '0'))
                 .map((task) => (
-                  <div key={task.id} className="truncate rounded px-2 py-1 text-[11px] font-bold text-white" style={{backgroundColor: categoryColor(categories, task.categoryId)}}>
+                  <div
+                    key={task.id}
+                    draggable
+                    onDragStart={(event) => writeDragPayload(event, {
+                      taskId: task.id,
+                      durationMinutes: taskDurationMinutes(task),
+                    })}
+                    className="truncate rounded px-2 py-1 text-[11px] font-bold text-white"
+                    style={{backgroundColor: categoryColor(categories, task.categoryId)}}
+                  >
                     {task.startAt?.slice(11, 16)} {task.title}
                   </div>
                 ))}
