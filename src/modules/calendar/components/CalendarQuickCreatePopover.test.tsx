@@ -100,7 +100,7 @@ describe('CalendarQuickCreatePopover', () => {
     expect(screen.getByLabelText('任务标题')).toHaveValue('写方案');
   });
 
-  it('cancels from Escape and cancel button', () => {
+  it('cancels from document Escape and cancel button', () => {
     const onCancel = vi.fn();
     const {rerender} = render(
       <CalendarQuickCreatePopover
@@ -111,7 +111,7 @@ describe('CalendarQuickCreatePopover', () => {
       />,
     );
 
-    fireEvent.keyDown(screen.getByRole('dialog'), {key: 'Escape'});
+    fireEvent.keyDown(document, {key: 'Escape'});
     expect(onCancel).toHaveBeenCalledOnce();
 
     rerender(
@@ -124,6 +124,23 @@ describe('CalendarQuickCreatePopover', () => {
     );
     fireEvent.click(screen.getByRole('button', {name: '取消'}));
     expect(onCancel).toHaveBeenCalledTimes(2);
+  });
+
+  it('removes the Escape listener on unmount', () => {
+    const onCancel = vi.fn();
+    const {unmount} = render(
+      <CalendarQuickCreatePopover
+        draft={timedDraft}
+        categories={categories}
+        onCancel={onCancel}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    unmount();
+    fireEvent.keyDown(document, {key: 'Escape'});
+
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
   it('submits from Enter in the title input', async () => {

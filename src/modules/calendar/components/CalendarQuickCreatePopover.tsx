@@ -50,6 +50,17 @@ export function CalendarQuickCreatePopover({draft, categories, onCancel, onSubmi
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [onCancel]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onCancel();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
   async function submitForm() {
     if (isSubmitting) return;
 
@@ -79,11 +90,6 @@ export function CalendarQuickCreatePopover({draft, categories, onCancel, onSubmi
       role="dialog"
       aria-label="快速创建任务"
       tabIndex={-1}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          onCancel();
-        }
-      }}
       className="absolute z-50 w-72 rounded-lg border border-slate-200 bg-white p-4 text-xs shadow-lg"
       style={{left: draft.anchor.x, top: draft.anchor.y}}
     >
