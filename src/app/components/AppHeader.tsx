@@ -1,4 +1,4 @@
-import {CalendarRange, ClipboardList, LayoutDashboard, ListTodo, Tags, Timer} from 'lucide-react';
+import {CalendarDays, CalendarRange, ClipboardList, LayoutDashboard, ListTodo, Tags, Timer} from 'lucide-react';
 
 import {APP_TABS, type AppTab} from '../navigation';
 import {THEME_STYLES, type ThemeId} from '../theme';
@@ -18,6 +18,7 @@ const iconMap = {
   today: LayoutDashboard,
   tasks: ListTodo,
   categories: Tags,
+  calendar: CalendarDays,
   daily: ClipboardList,
   weekly: CalendarRange,
   focus: Timer,

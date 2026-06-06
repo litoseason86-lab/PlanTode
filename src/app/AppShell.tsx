@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
 
+import {CalendarPanel} from '../modules/calendar/components/CalendarPanel';
 import {CategoryPanel} from '../modules/categories/components/CategoryPanel';
 import {useCategoryActions} from '../modules/categories/controllers/useCategoryActions';
 import {DashboardPanel} from '../modules/dashboard/components/DashboardPanel';
@@ -228,6 +229,13 @@ export default function AppShell() {
             handleOpenCategoryModal={categoryActions.handleOpenCategoryModal}
             handleDeleteCategory={categoryActions.handleDeleteCategory}
             handleSaveCategory={categoryActions.handleSaveCategory}
+          />
+        )}
+        {activeTab === 'calendar' && (
+          <CalendarPanel
+            styleContext={{primary: styleContext.primary, primaryLight: styleContext.primaryLight, secondary: styleContext.secondary}}
+            categories={categories}
+            showToast={showToast}
           />
         )}
         {activeTab === 'daily' && (

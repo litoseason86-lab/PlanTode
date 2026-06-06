@@ -7,7 +7,7 @@ import {getErrorMessage} from '../../../app/errors';
 import {tasksApi} from '../api/tasksApi';
 import {filterTasks} from './useTasksController';
 
-type AppTab = 'today' | 'tasks' | 'categories' | 'daily' | 'weekly' | 'focus';
+type AppTab = 'today' | 'tasks' | 'categories' | 'calendar' | 'daily' | 'weekly' | 'focus';
 
 interface UseTaskActionsArgs {
   categories: Category[];
