@@ -1,4 +1,4 @@
-import {makeLocalDateTime} from '../../../../shared/lib/schedule';
+import {isLocalDateTimeString, makeLocalDateTime} from '../../../../shared/lib/schedule';
 
 export type WeekTimelineDensity = 'compact' | 'standard' | 'comfortable';
 
@@ -47,9 +47,13 @@ function clampStartMinute(minutes: number): number {
 }
 
 function minuteFromPointer(input: {hour: number; clientY: number; rectTop: number; hourHeight: number}): number {
-  const rawMinute = ((input.clientY - input.rectTop) / input.hourHeight) * 60;
+  const hour = Number.isFinite(input.hour) ? Math.floor(input.hour) : 0;
+  const hourWithinDay = Math.min(23, Math.max(0, hour));
+  const rawMinute = Number.isFinite(input.hourHeight) && input.hourHeight > 0
+    ? ((input.clientY - input.rectTop) / input.hourHeight) * 60
+    : 0;
   const minuteWithinHour = Math.min(45, Math.max(0, snapMinutes(rawMinute)));
-  return clampStartMinute(input.hour * 60 + minuteWithinHour);
+  return clampStartMinute(hourWithinDay * 60 + minuteWithinHour);
 }
 
 function makeDateTimeFromMinute(date: string, minuteOfDay: number): string {
@@ -157,6 +161,10 @@ export function getResizeDurationMinutes(input: {
 }
 
 export function canResizeTimedTask(startAt: string): boolean {
+  if (!isLocalDateTimeString(startAt)) {
+    return false;
+  }
+
   const hour = Number(startAt.slice(11, 13));
   const minute = Number(startAt.slice(14, 16));
   return hour * 60 + minute <= LATEST_TIMED_TASK_START_MINUTES;

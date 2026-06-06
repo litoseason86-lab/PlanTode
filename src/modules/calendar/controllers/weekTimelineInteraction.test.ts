@@ -53,6 +53,34 @@ describe('weekTimelineInteraction', () => {
     });
   });
 
+  it('falls back to midnight when point creation receives an invalid hour', () => {
+    expect(buildTimedQuickCreateDraftFromPoint({
+      date: '2026-06-06',
+      hour: Number.NaN,
+      clientY: 132,
+      rectTop: 100,
+      hourHeight: 64,
+      anchor: {x: 20, y: 132},
+    })).toMatchObject({
+      startAt: '2026-06-06T00:30:00.000',
+      endAt: '2026-06-06T01:30:00.000',
+    });
+  });
+
+  it('falls back to the hour start when point creation receives an invalid hour height', () => {
+    expect(buildTimedQuickCreateDraftFromPoint({
+      date: '2026-06-06',
+      hour: 9,
+      clientY: 132,
+      rectTop: 100,
+      hourHeight: 0,
+      anchor: {x: 20, y: 132},
+    })).toMatchObject({
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+    });
+  });
+
   it('creates an ascending timed draft from downward drag', () => {
     expect(buildTimedQuickCreateDraftFromDrag({
       date: '2026-06-06',
@@ -159,5 +187,10 @@ describe('weekTimelineInteraction', () => {
   it('allows resize only when a 15 minute same-day end is possible', () => {
     expect(canResizeTimedTask('2026-06-06T23:44:00.000')).toBe(true);
     expect(canResizeTimedTask('2026-06-06T23:45:00.000')).toBe(false);
+  });
+
+  it('rejects invalid resize start datetimes', () => {
+    expect(canResizeTimedTask('')).toBe(false);
+    expect(canResizeTimedTask('bad')).toBe(false);
   });
 });
