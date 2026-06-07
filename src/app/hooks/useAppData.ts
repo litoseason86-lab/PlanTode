@@ -1,14 +1,16 @@
 import {useCallback, useRef, useState} from 'react';
 
-import type {Category, Task, TaskExecutionSession} from '../../../shared/domain/entities';
+import type {Category, Tag, Task, TaskExecutionSession} from '../../../shared/domain/entities';
 import {toIsoDate} from '../../../shared/lib/date';
 import {categoriesApi} from '../../modules/categories/api/categoriesApi';
 import {focusApi} from '../../modules/focus/api/focusApi';
+import {tagsApi} from '../../modules/tags/api/tagsApi';
 import {tasksApi} from '../../modules/tasks/api/tasksApi';
 
 export function useAppData() {
   const selectedDateLoadSeqRef = useRef(0);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedDateSessions, setSelectedDateSessions] = useState<TaskExecutionSession[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
@@ -18,6 +20,12 @@ export function useAppData() {
   const refreshCategories = useCallback(async () => {
     const data = await categoriesApi.getCategories();
     setCategories(data);
+    return data;
+  }, []);
+
+  const refreshTags = useCallback(async () => {
+    const data = await tagsApi.getTags();
+    setTags(data);
     return data;
   }, []);
 
@@ -55,13 +63,15 @@ export function useAppData() {
     try {
       const catsData = await categoriesApi.getCategories();
       setCategories(catsData);
+      const tagsData = await tagsApi.getTags();
+      setTags(tagsData);
       const tasksData = await tasksApi.getTasks({date: selectedDate});
       if (loadSeq === selectedDateLoadSeqRef.current) {
         setTasks(tasksData);
       }
       const all = await tasksApi.getTasks();
       setAllTasks(all);
-      return {categories: catsData, tasks: tasksData, allTasks: all};
+      return {categories: catsData, tags: tagsData, tasks: tasksData, allTasks: all};
     } finally {
       setLoading(false);
     }
@@ -69,6 +79,7 @@ export function useAppData() {
 
   return {
     categories,
+    tags,
     tasks,
     selectedDateSessions,
     allTasks,
@@ -77,6 +88,7 @@ export function useAppData() {
     selectedDate,
     setSelectedDate,
     refreshCategories,
+    refreshTags,
     refreshAllTasks,
     loadTasksForSelectedDate,
     loadMetaData,

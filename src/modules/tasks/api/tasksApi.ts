@@ -1,8 +1,9 @@
 import type {Task} from '../../../../shared/domain/entities';
-import type {TaskStatus} from '../../../../shared/domain/status';
+import type {TaskPriority, TaskStatus} from '../../../../shared/domain/status';
 import {requestJson} from '../../../shared/api/httpClient';
 
 type ScheduledFilter = 'unscheduled' | 'scheduled' | 'all-day-without-time';
+type PriorityFilter = TaskPriority | 'none';
 
 export interface TaskSchedulePayload {
   plannedDate?: string | null;
@@ -21,6 +22,8 @@ export const tasksApi = {
     categoryId?: number;
     scheduled?: ScheduledFilter;
     query?: string;
+    priority?: PriorityFilter;
+    tagIds?: number[];
   }): Promise<Task[]> {
     const params = new URLSearchParams();
     if (filters?.date) params.append('date', filters.date);
@@ -30,6 +33,8 @@ export const tasksApi = {
     if (filters?.categoryId) params.append('categoryId', String(filters.categoryId));
     if (filters?.scheduled) params.append('scheduled', filters.scheduled);
     if (filters?.query) params.append('query', filters.query);
+    if (filters?.priority) params.append('priority', filters.priority);
+    if (filters?.tagIds && filters.tagIds.length > 0) params.append('tagIds', filters.tagIds.join(','));
 
     const query = params.toString();
     return requestJson<Task[]>(`/api/tasks${query ? `?${query}` : ''}`);
@@ -43,6 +48,8 @@ export const tasksApi = {
     startAt?: string;
     endAt?: string;
     allDay?: boolean;
+    priority?: TaskPriority | null;
+    tagIds?: number[];
   }): Promise<Task> {
     return requestJson<Task>('/api/tasks', {
       method: 'POST',
@@ -64,6 +71,21 @@ export const tasksApi = {
     return requestJson<Task>(`/api/tasks/${id}/schedule`, {
       method: 'PATCH',
       body: JSON.stringify(schedule),
+    });
+  },
+
+  updateTaskDetails(
+    id: number,
+    details: {
+      title: string;
+      categoryId: number;
+      priority: TaskPriority | null;
+      tagIds: number[];
+    },
+  ): Promise<Task> {
+    return requestJson<Task>(`/api/tasks/${id}/details`, {
+      method: 'PATCH',
+      body: JSON.stringify(details),
     });
   },
 

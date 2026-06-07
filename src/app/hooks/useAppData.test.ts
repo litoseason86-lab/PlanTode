@@ -1,8 +1,9 @@
 import {act, renderHook, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
-import type {Task, TaskExecutionSession} from '../../../shared/domain/entities';
+import type {Tag, Task, TaskExecutionSession} from '../../../shared/domain/entities';
 import {focusApi} from '../../modules/focus/api/focusApi';
+import {tagsApi} from '../../modules/tags/api/tagsApi';
 import {tasksApi} from '../../modules/tasks/api/tasksApi';
 import {useAppData} from './useAppData';
 
@@ -15,6 +16,12 @@ vi.mock('../../modules/categories/api/categoriesApi', () => ({
 vi.mock('../../modules/focus/api/focusApi', () => ({
   focusApi: {
     getSessions: vi.fn(),
+  },
+}));
+
+vi.mock('../../modules/tags/api/tagsApi', () => ({
+  tagsApi: {
+    getTags: vi.fn(),
   },
 }));
 
@@ -52,9 +59,34 @@ function session(id: number, taskId: number): TaskExecutionSession {
   };
 }
 
+const tags: Tag[] = [
+  {id: 1, userId: 1, name: '客户 A', createdAt: '', updatedAt: ''},
+];
+
 describe('useAppData', () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('loads tags as app metadata and exposes refreshTags', async () => {
+    const {categoriesApi} = await import('../../modules/categories/api/categoriesApi');
+    vi.mocked(categoriesApi.getCategories).mockResolvedValue([]);
+    vi.mocked(tagsApi.getTags)
+      .mockResolvedValueOnce(tags)
+      .mockResolvedValueOnce([{id: 2, userId: 1, name: '客户 B', createdAt: '', updatedAt: ''}]);
+    vi.mocked(tasksApi.getTasks).mockResolvedValue([]);
+
+    const {result} = renderHook(() => useAppData());
+
+    await act(async () => {
+      await result.current.loadMetaData();
+    });
+
+    expect(result.current.tags).toEqual(tags);
+    await act(async () => {
+      expect(await result.current.refreshTags()).toEqual([{id: 2, userId: 1, name: '客户 B', createdAt: '', updatedAt: ''}]);
+    });
+    expect(result.current.tags).toEqual([{id: 2, userId: 1, name: '客户 B', createdAt: '', updatedAt: ''}]);
   });
 
   it('ignores stale selected-date task and session responses', async () => {
@@ -107,6 +139,7 @@ describe('useAppData', () => {
     vi.mocked(categoriesApi.getCategories).mockReturnValueOnce(new Promise((resolve) => {
       resolveCategories = resolve;
     }));
+    vi.mocked(tagsApi.getTags).mockResolvedValue([]);
     vi.mocked(tasksApi.getTasks)
       .mockResolvedValueOnce(newTasks)
       .mockResolvedValueOnce(oldTasks)

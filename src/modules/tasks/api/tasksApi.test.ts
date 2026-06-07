@@ -107,4 +107,73 @@ describe('tasksApi', () => {
       body: JSON.stringify({taskIds: [1, 2]}),
     }));
   });
+
+  it('creates a task with priority and tag ids', async () => {
+    const fetch = vi.fn().mockResolvedValue({ok: true, json: async () => ({id: 1})});
+    vi.stubGlobal('fetch', fetch);
+
+    await tasksApi.createTask({
+      title: '收集资料',
+      categoryId: 1,
+      priority: 'P1',
+      tagIds: [1, 2],
+    });
+
+    expect(fetch).toHaveBeenCalledWith('/api/tasks', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        title: '收集资料',
+        categoryId: 1,
+        priority: 'P1',
+        tagIds: [1, 2],
+      }),
+    }));
+  });
+
+  it('updates task details with metadata replacement', async () => {
+    const fetch = vi.fn().mockResolvedValue({ok: true, json: async () => ({id: 1})});
+    vi.stubGlobal('fetch', fetch);
+
+    await tasksApi.updateTaskDetails(1, {
+      title: '重命名任务',
+      categoryId: 2,
+      priority: null,
+      tagIds: [3],
+    });
+
+    expect(fetch).toHaveBeenCalledWith('/api/tasks/1/details', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({
+        title: '重命名任务',
+        categoryId: 2,
+        priority: null,
+        tagIds: [3],
+      }),
+    }));
+  });
+
+  it('queries tasks by priority and comma-separated tag ids', async () => {
+    const fetch = vi.fn().mockResolvedValue({ok: true, json: async () => []});
+    vi.stubGlobal('fetch', fetch);
+
+    await tasksApi.getTasks({
+      priority: 'P1',
+      tagIds: [1, 2],
+      query: '周报',
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/tasks?query=%E5%91%A8%E6%8A%A5&priority=P1&tagIds=1%2C2',
+      expect.any(Object),
+    );
+  });
+
+  it('queries tasks whose priority is explicitly none', async () => {
+    const fetch = vi.fn().mockResolvedValue({ok: true, json: async () => []});
+    vi.stubGlobal('fetch', fetch);
+
+    await tasksApi.getTasks({priority: 'none'});
+
+    expect(fetch).toHaveBeenCalledWith('/api/tasks?priority=none', expect.any(Object));
+  });
 });
