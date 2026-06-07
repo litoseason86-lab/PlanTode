@@ -8,6 +8,8 @@
 
 **Tech Stack:** React 19, TypeScript, Vitest, Testing Library, Vite, Tailwind CSS, existing Express task APIs.
 
+**Execution Discipline:** Execute tasks sequentially. Do not parallelize implementation tasks: Tasks 1-7 share `WeekTimelineView`, controller types, and toolbar wiring. Record the base SHA in Task 0 and use it for final diff checks.
+
 ---
 
 ## File Structure
@@ -21,12 +23,10 @@
 - Modify: `src/modules/calendar/controllers/calendarSettings.test.ts` - test density defaults, persistence, and corrupt/partial settings.
 - Modify: `src/modules/calendar/controllers/useCalendarController.ts` - own quick-create draft state, submit logic, density setter, all-day/timed create actions.
 - Modify: `src/modules/calendar/controllers/useCalendarController.test.ts` - controller quick-create and density tests.
-- Modify: `src/modules/calendar/controllers/useTaskSchedulingActions.ts` - clamp resize/move end times before calling local datetime addition.
-- Modify: `src/modules/calendar/controllers/useTaskSchedulingActions.test.ts` - resize/move clamp tests.
+- Modify: `src/modules/calendar/controllers/useTaskSchedulingActions.ts` - clamp resize end times and refresh after failed resize mutations.
+- Modify: `src/modules/calendar/controllers/useTaskSchedulingActions.test.ts` - resize clamp and failed-resize refresh tests.
 - Modify: `src/modules/calendar/controllers/calendarLayout.ts` - add week all-day segment helper or reusable segment wrapper.
 - Modify: `src/modules/calendar/controllers/calendarLayout.test.ts` - week all-day segment tests.
-- Modify: `src/modules/calendar/controllers/weekTimelineLayout.ts` - replace fixed-pixel assumptions with `hourHeight`-aware helpers where needed.
-- Modify: `src/modules/calendar/controllers/weekTimelineLayout.test.ts` - density-aware drop/resize regression tests.
 - Modify: `src/modules/calendar/components/WeekTimelineView.tsx` - wire quick create, density heights, resize gate, continuous all-day rendering.
 - Modify: `src/modules/calendar/components/WeekTimelineView.test.tsx` - view-level quick-create, event priority, all-day segment, and resize-handle tests.
 - Modify: `src/modules/calendar/components/CalendarToolbar.tsx` - capability props for scheduling sidebar and density controls.
@@ -35,6 +35,34 @@
 - Modify: `src/modules/calendar/components/CalendarSurface.tsx` - pass full/embedded capabilities to week view.
 - Modify: `src/modules/calendar/components/EmbeddedCalendarPanel.tsx` - keep quick-create/sidebar/density controls disabled.
 - Modify: `src/modules/calendar/components/EmbeddedCalendarPanel.test.tsx` - assert full-calendar-only controls stay hidden.
+
+---
+
+### Task 0: Execution Guardrails
+
+**Files:**
+- Inspect: repository state only.
+
+- [ ] **Step 1: Verify clean worktree**
+
+Run:
+
+```bash
+git status --short
+```
+
+Expected: no output. If any file is listed, stop and inspect before editing. Do not stage unrelated user changes.
+
+- [ ] **Step 2: Record base SHA for final review**
+
+Run:
+
+```bash
+git rev-parse HEAD > .git/week-planning-efficiency-base
+cat .git/week-planning-efficiency-base
+```
+
+Expected: prints one commit SHA. Task 8 uses this file for diff and whitespace checks.
 
 ---
 
@@ -110,7 +138,7 @@ describe('weekTimelineInteraction', () => {
       startHour: 9,
       startClientY: 100,
       endHour: 11,
-      endClientY: 32,
+      endClientY: 132,
       startRectTop: 100,
       endRectTop: 100,
       hourHeight: 64,
@@ -127,7 +155,7 @@ describe('weekTimelineInteraction', () => {
       startHour: 12,
       startClientY: 100,
       endHour: 10,
-      endClientY: 32,
+      endClientY: 132,
       startRectTop: 100,
       endRectTop: 100,
       hourHeight: 64,
@@ -687,6 +715,37 @@ it('keeps the quick create draft and returns an error when create fails', async 
   expect(result.current.quickCreateDraft).toMatchObject({kind: 'timed'});
 });
 
+it('closes quick create and returns success when post-create refresh fails', async () => {
+  const showToast = vi.fn();
+  vi.mocked(calendarApi.getCalendarTasks).mockRejectedValue(new Error('刷新失败'));
+  vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+  vi.mocked(calendarApi.createCalendarTask).mockResolvedValue({id: 1} as never);
+
+  const {result} = renderHook(() => useCalendarController({
+    categories: [{id: 8, userId: 1, name: '工作', color: '#ef4444', sortOrder: 1, createdAt: '', updatedAt: ''}],
+    initialDate: '2026-06-06',
+    showToast,
+  }));
+
+  act(() => result.current.openQuickCreateDraft({
+    kind: 'timed',
+    plannedDate: '2026-06-06',
+    startAt: '2026-06-06T09:00:00.000',
+    endAt: '2026-06-06T10:00:00.000',
+    anchor: {x: 10, y: 20},
+  }));
+
+  await act(async () => {
+    await expect(result.current.submitQuickCreateDraft({
+      title: '写方案',
+      categoryId: 8,
+    })).resolves.toEqual({ok: true});
+  });
+
+  expect(result.current.quickCreateDraft).toBeUndefined();
+  expect(showToast).toHaveBeenCalledWith('刷新失败', 'error');
+});
+
 it('stores week timeline density through calendar settings', async () => {
   vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
   vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
@@ -773,13 +832,22 @@ async function submitQuickCreateDraft(input: {title: string; categoryId: number}
       endAt: quickCreateDraft.kind === 'timed' ? quickCreateDraft.endAt : undefined,
       allDay: quickCreateDraft.kind === 'all-day',
     });
-    setQuickCreateDraft(undefined);
-    await refreshCalendarData();
-    await onMutationSuccess?.();
-    return {ok: true};
   } catch (error) {
     return {ok: false, message: error instanceof Error ? error.message : '任务创建失败'};
   }
+
+  setQuickCreateDraft(undefined);
+  try {
+    await refreshCalendarData();
+  } catch (error) {
+    showToastRef.current(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+  }
+  try {
+    await onMutationSuccess?.();
+  } catch (error) {
+    showToastRef.current(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+  }
+  return {ok: true};
 }
 ```
 
@@ -942,6 +1010,41 @@ describe('CalendarQuickCreatePopover', () => {
     fireEvent.click(screen.getByRole('button', {name: '取消'}));
     expect(onCancel).toHaveBeenCalledTimes(2);
   });
+
+  it('submits from Enter in the title input', async () => {
+    const onSubmit = vi.fn().mockResolvedValue({ok: true});
+    render(
+      <CalendarQuickCreatePopover
+        draft={timedDraft}
+        categories={categories}
+        onCancel={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('任务标题'), {target: {value: '写方案'}});
+    fireEvent.keyDown(screen.getByLabelText('任务标题'), {key: 'Enter'});
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({title: '写方案', categoryId: 1}));
+  });
+
+  it('cancels from outside pointer down', () => {
+    const onCancel = vi.fn();
+    render(
+      <div>
+        <button type="button">外部区域</button>
+        <CalendarQuickCreatePopover
+          draft={timedDraft}
+          categories={categories}
+          onCancel={onCancel}
+          onSubmit={vi.fn()}
+        />
+      </div>,
+    );
+
+    fireEvent.pointerDown(screen.getByRole('button', {name: '外部区域'}));
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
 });
 ```
 
@@ -980,6 +1083,9 @@ Implementation constraints:
 - Inline error text for no category, empty title, and submit failure.
 - Save button text must be `保存`; cancel button text must be `取消`.
 - Keep form state if `onSubmit` returns `{ok:false}`.
+- Submit on Enter from the title input.
+- Cancel on Escape, cancel button click, and pointer down outside the dialog.
+- Use a `ref` on the dialog for outside-click detection and remove any document/window listener on unmount.
 
 - [ ] **Step 4: Run popover tests and verify GREEN**
 
@@ -1040,6 +1146,7 @@ it('builds week all-day segments for cross-day tasks', () => {
       endsOn: '2026-06-21',
       startIndex: 3,
       span: 4,
+      rowIndex: 0,
       continuesBefore: false,
       continuesAfter: false,
     },
@@ -1069,9 +1176,51 @@ it('clips week all-day segments at visible boundaries', () => {
     endsOn: '2026-06-21',
     startIndex: 0,
     span: 7,
+    rowIndex: 0,
     continuesBefore: true,
     continuesAfter: true,
   });
+});
+
+it('assigns separate rows to overlapping week all-day segments', () => {
+  expect(buildWeekAllDaySegments({
+    dateFrom: '2026-06-15',
+    dateTo: '2026-06-21',
+    tasks: [
+      {
+        id: 1,
+        userId: 1,
+        categoryId: 1,
+        title: '跨天任务 A',
+        plannedDate: '2026-06-18',
+        plannedEndDate: '2026-06-20',
+        allDay: true,
+        status: 'TODO',
+        createdAt: '',
+        updatedAt: '',
+      },
+      {
+        id: 2,
+        userId: 1,
+        categoryId: 1,
+        title: '跨天任务 B',
+        plannedDate: '2026-06-19',
+        plannedEndDate: '2026-06-21',
+        allDay: true,
+        status: 'TODO',
+        createdAt: '',
+        updatedAt: '',
+      },
+    ],
+  }).map((segment) => ({
+    taskId: segment.taskId,
+    startIndex: segment.startIndex,
+    span: segment.span,
+    rowIndex: segment.rowIndex,
+  }))).toEqual([
+    {taskId: 1, startIndex: 3, span: 3, rowIndex: 0},
+    {taskId: 2, startIndex: 4, span: 3, rowIndex: 1},
+  ]);
 });
 ```
 
@@ -1093,6 +1242,7 @@ In `src/modules/calendar/controllers/calendarLayout.ts`, export:
 export interface WeekAllDaySegment extends AllDaySegment {
   startIndex: number;
   span: number;
+  rowIndex: number;
 }
 
 export function buildWeekAllDaySegments(input: {
@@ -1100,7 +1250,7 @@ export function buildWeekAllDaySegments(input: {
   dateTo: string;
   tasks: Task[];
 }): WeekAllDaySegment[] {
-  return input.tasks
+  const segments = input.tasks
     .filter((task): task is Task & {plannedDate: string} => Boolean(task.plannedDate && task.allDay))
     .map((task) => {
       const segment = segmentAllDayTask(task, input.dateFrom, input.dateTo);
@@ -1111,6 +1261,15 @@ export function buildWeekAllDaySegments(input: {
       };
     })
     .sort((a, b) => a.startIndex - b.startIndex || b.span - a.span || a.taskId - b.taskId);
+
+  const rowEndIndexes: number[] = [];
+  return segments.map((segment) => {
+    const segmentEndIndex = segment.startIndex + segment.span - 1;
+    const availableRow = rowEndIndexes.findIndex((endIndex) => endIndex < segment.startIndex);
+    const rowIndex = availableRow === -1 ? rowEndIndexes.length : availableRow;
+    rowEndIndexes[rowIndex] = segmentEndIndex;
+    return {...segment, rowIndex};
+  });
 }
 ```
 
@@ -1179,13 +1338,17 @@ Modify `WeekTimelineView.tsx`:
 - Build week visible start/end from `days`.
 - De-dupe all all-day tasks by ID from `tasksByDate`.
 - Use `buildWeekAllDaySegments`.
-- Render a segment layer in the all-day header using CSS grid columns:
+- Render a segment layer in the all-day header using CSS grid columns and rows:
 
 ```tsx
-style={{gridColumn: `${segment.startIndex + 2} / span ${segment.span}`}}
+style={{
+  gridColumn: `${segment.startIndex + 2} / span ${segment.span}`,
+  gridRow: segment.rowIndex + 1,
+}}
 ```
 
 Column `1` is the left label column, so segment columns start at `2`.
+- Set the segment layer row template from the maximum `rowIndex` so overlapping all-day spans do not visually stack on top of each other.
 
 - Keep all-day lane drop targets available per day.
 - Segment labels use:
@@ -1223,7 +1386,36 @@ git commit -m "feat: render week all-day spans"
 
 - [ ] **Step 1: Extend WeekTimelineView props in tests**
 
-Update `renderWeek()` in `WeekTimelineView.test.tsx` to pass:
+Add this helper to `WeekTimelineView.test.tsx`:
+
+```tsx
+function mockElementRect(element: HTMLElement, rect: Partial<DOMRect>) {
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+    width: rect.width ?? 1024,
+    height: rect.height ?? 64,
+    top: rect.top ?? 0,
+    left: rect.left ?? 0,
+    right: rect.right ?? 1024,
+    bottom: rect.bottom ?? (rect.top ?? 0) + (rect.height ?? 64),
+    x: rect.left ?? 0,
+    y: rect.top ?? 0,
+    toJSON() {
+      return this;
+    },
+  } as DOMRect);
+}
+
+```
+
+Update `renderWeek()` in `WeekTimelineView.test.tsx` to pass defaults:
+
+```tsx
+enableQuickCreate={false}
+weekTimelineDensity="standard"
+onOpenQuickCreate={vi.fn()}
+```
+
+Also update the direct `<WeekTimelineView ... />` render in the malformed-date test to pass the same three props. Leaving that call untouched will make TypeScript fail after the props are added.
 
 ```tsx
 enableQuickCreate={false}
@@ -1237,9 +1429,11 @@ Then add failing tests:
 it('opens quick create from a week time slot when enabled', () => {
   const onOpenQuickCreate = vi.fn();
   renderWeek({enableQuickCreate: true, onOpenQuickCreate});
+  const slot = screen.getByLabelText('2026-06-06 09:00');
+  mockElementRect(slot, {top: 100, height: 64});
 
-  fireEvent.pointerDown(screen.getByLabelText('2026-06-06 09:00'), {clientY: 100, clientX: 20});
-  fireEvent.pointerUp(screen.getByLabelText('2026-06-06 09:00'), {clientY: 100, clientX: 20});
+  fireEvent.pointerDown(slot, {clientY: 100, clientX: 20});
+  fireEvent.pointerUp(slot, {clientY: 100, clientX: 20});
 
   expect(onOpenQuickCreate).toHaveBeenCalledWith(expect.objectContaining({
     kind: 'timed',
@@ -1252,9 +1446,11 @@ it('opens quick create from a week time slot when enabled', () => {
 it('does not open quick create when disabled', () => {
   const onOpenQuickCreate = vi.fn();
   renderWeek({enableQuickCreate: false, onOpenQuickCreate});
+  const slot = screen.getByLabelText('2026-06-06 09:00');
+  mockElementRect(slot, {top: 100, height: 64});
 
-  fireEvent.pointerDown(screen.getByLabelText('2026-06-06 09:00'), {clientY: 100, clientX: 20});
-  fireEvent.pointerUp(screen.getByLabelText('2026-06-06 09:00'), {clientY: 100, clientX: 20});
+  fireEvent.pointerDown(slot, {clientY: 100, clientX: 20});
+  fireEvent.pointerUp(slot, {clientY: 100, clientX: 20});
 
   expect(onOpenQuickCreate).not.toHaveBeenCalled();
 });
@@ -1288,6 +1484,50 @@ it('uses density height for timeline rows', () => {
   renderWeek({weekTimelineDensity: 'comfortable'});
   expect(screen.getByLabelText('2026-06-06 09:00')).toHaveStyle({height: '88px'});
 });
+
+it('uses density height when converting a quick-create pointer offset', () => {
+  const onOpenQuickCreate = vi.fn();
+  renderWeek({enableQuickCreate: true, weekTimelineDensity: 'comfortable', onOpenQuickCreate});
+  const slot = screen.getByLabelText('2026-06-06 09:00');
+  mockElementRect(slot, {top: 100, height: 88});
+
+  fireEvent.pointerDown(slot, {clientY: 144, clientX: 20});
+  fireEvent.pointerUp(slot, {clientY: 144, clientX: 20});
+
+  expect(onOpenQuickCreate).toHaveBeenCalledWith(expect.objectContaining({
+    startAt: '2026-06-06T09:30:00.000',
+    endAt: '2026-06-06T10:30:00.000',
+  }));
+});
+
+it('uses density height when converting resize pointer movement', () => {
+  const onResizeTimedTask = vi.fn().mockResolvedValue(true);
+  renderWeek({
+    weekTimelineDensity: 'comfortable',
+    onResizeTimedTask,
+    tasksByDate: {
+      '2026-06-06': [{
+        ...task,
+        id: 2,
+        title: '时间段任务',
+        plannedDate: '2026-06-06',
+        allDay: false,
+        startAt: '2026-06-06T09:00:00.000',
+        endAt: '2026-06-06T10:00:00.000',
+      }],
+    },
+  });
+
+  fireEvent.pointerDown(screen.getByLabelText('调整时间段任务时长'), {clientY: 100});
+  fireEvent.pointerUp(window, {clientY: 144});
+
+  expect(onResizeTimedTask).toHaveBeenCalledWith(expect.objectContaining({
+    taskId: 2,
+    plannedDate: '2026-06-06',
+    startAt: '2026-06-06T09:00:00.000',
+    durationMinutes: 90,
+  }));
+});
 ```
 
 - [ ] **Step 2: Add failing resize action tests**
@@ -1302,18 +1542,36 @@ it('resizes a task without crossing the day boundary', async () => {
   }));
   vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
 
-  await act(async () => {
-    await result.current.resizeTimedTask({
-      taskId: 1,
-      plannedDate: '2026-06-06',
-      startAt: '2026-06-06T23:00:00.000',
-      durationMinutes: 90,
-    });
+  await result.current.resizeTimedTask({
+    taskId: 1,
+    plannedDate: '2026-06-06',
+    startAt: '2026-06-06T23:00:00.000',
+    durationMinutes: 90,
   });
 
   expect(calendarApi.updateTaskSchedule).toHaveBeenCalledWith(1, expect.objectContaining({
     endAt: '2026-06-06T23:59:00.000',
   }));
+});
+
+it('refreshes calendar data after a failed resize mutation', async () => {
+  const showToast = vi.fn();
+  const refreshCalendarData = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(calendarApi.updateTaskSchedule).mockRejectedValue(new Error('调整失败'));
+  const {result} = renderHook(() => useTaskSchedulingActions({
+    showToast,
+    refreshCalendarData,
+  }));
+
+  await expect(result.current.resizeTimedTask({
+    taskId: 1,
+    plannedDate: '2026-06-06',
+    startAt: '2026-06-06T09:00:00.000',
+    durationMinutes: 120,
+  })).resolves.toBe(false);
+
+  expect(showToast).toHaveBeenCalledWith('调整失败', 'error');
+  expect(refreshCalendarData).toHaveBeenCalledOnce();
 });
 ```
 
@@ -1334,11 +1592,12 @@ Modify `WeekTimelineView.tsx`:
 - Add props:
 
 ```ts
-enableQuickCreate: boolean;
-weekTimelineDensity: WeekTimelineDensity;
-onOpenQuickCreate: (draft: CalendarQuickCreateDraft) => void;
+enableQuickCreate?: boolean;
+weekTimelineDensity?: WeekTimelineDensity;
+onOpenQuickCreate?: (draft: CalendarQuickCreateDraft) => void;
 ```
 
+- In the component parameter list, default to `enableQuickCreate = false`, `weekTimelineDensity = 'standard'`, and `onOpenQuickCreate = () => {}` so embedded and older test call sites fail closed.
 - Replace hard-coded `h-16` row heights with inline `height: `${hourHeight}px`` from `hourHeightForDensity`.
 - Replace local `getResizeDurationMinutes` with imported helper.
 - Hide resize handle when `!canResizeTimedTask(task.startAt)`.
@@ -1346,6 +1605,7 @@ onOpenQuickCreate: (draft: CalendarQuickCreateDraft) => void;
 - In pointer handlers, ignore if `enableQuickCreate` is false.
 - In drop handlers, keep existing scheduling behavior and do not open quick create.
 - Use imported `buildTimedQuickCreateDraftFromPoint`, `buildTimedQuickCreateDraftFromDrag`, `buildAllDayQuickCreateDraft`.
+- For quick-create pointer tests, always use `event.currentTarget.getBoundingClientRect()` and `hourHeight`; never rely on the global jsdom rect from `tests/setup.ts`.
 
 - [ ] **Step 5: Clamp resize action end time**
 
@@ -1363,7 +1623,8 @@ function addDurationWithinDay(startAt: string, durationMinutes: number): string 
 ```
 
 - Use it in `resizeTimedTask`.
-- Leave `moveTimedTask` behavior unchanged unless tests reveal an existing regression.
+- On failed `resizeTimedTask` mutation, show the error toast, call `refreshCalendarData()` once to restore server state, do not call `onMutationSuccess`, and return `false`.
+- Leave `moveTimedTask` behavior unchanged; moving across midnight remains governed by the existing backend schedule rule and is outside this feature.
 
 - [ ] **Step 6: Run tests and verify GREEN**
 
@@ -1396,9 +1657,27 @@ git commit -m "feat: wire week quick create interactions"
 
 - [ ] **Step 1: Write failing CalendarPanel integration tests**
 
-Append to `CalendarPanel.test.tsx`:
+Append to `CalendarPanel.test.tsx`. The quick-create and density tests are expected to fail before implementation. The sidebar fake-tab and localStorage assertions are regression checks and may already pass.
 
 ```tsx
+function mockElementRect(element: HTMLElement, rect: Partial<DOMRect>) {
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+    width: rect.width ?? 1024,
+    height: rect.height ?? 64,
+    top: rect.top ?? 0,
+    left: rect.left ?? 0,
+    right: rect.right ?? 1024,
+    bottom: rect.bottom ?? (rect.top ?? 0) + (rect.height ?? 64),
+    x: rect.left ?? 0,
+    y: rect.top ?? 0,
+    toJSON() {
+      return this;
+    },
+  } as DOMRect);
+}
+
+const CALENDAR_SETTINGS_STORAGE_KEY = 'plantodo.calendar.settings';
+
 it('opens and closes the scheduling sidebar from the toolbar', async () => {
   vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
   vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
@@ -1412,15 +1691,30 @@ it('opens and closes the scheduling sidebar from the toolbar', async () => {
   expect(await screen.findByText('未安排任务')).toBeInTheDocument();
 });
 
+it('does not persist scheduling sidebar open state to localStorage', async () => {
+  vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+  vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+  renderCalendarPanelWithSidebarTasks();
+
+  expect(await screen.findByText('安排任务')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name: '关闭安排任务'}));
+
+  const storedSettings = localStorage.getItem(CALENDAR_SETTINGS_STORAGE_KEY) ?? '';
+  expect(storedSettings).not.toContain('schedulingSidebar');
+  expect(storedSettings).not.toContain('sidebarOpen');
+});
+
 it('quick creates a timed task from the week timeline', async () => {
   vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
   vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
   vi.mocked(calendarApi.createCalendarTask).mockResolvedValue({id: 99} as never);
 
   renderCalendarPanelWithSidebarTasks();
+  const slot = screen.getByLabelText('2026-06-06 09:00');
+  mockElementRect(slot, {top: 100, height: 64});
 
-  fireEvent.pointerDown(screen.getByLabelText('2026-06-06 09:00'), {clientX: 100, clientY: 100});
-  fireEvent.pointerUp(screen.getByLabelText('2026-06-06 09:00'), {clientX: 100, clientY: 100});
+  fireEvent.pointerDown(slot, {clientX: 100, clientY: 100});
+  fireEvent.pointerUp(slot, {clientX: 100, clientY: 100});
 
   expect(await screen.findByRole('dialog', {name: '快速创建任务'})).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('任务标题'), {target: {value: '写方案'}});
@@ -1437,15 +1731,63 @@ it('quick creates a timed task from the week timeline', async () => {
   await waitFor(() => expect(calendarApi.getUnscheduledTasks).toHaveBeenCalledTimes(2));
 });
 
+it('quick creates a cross-day all-day task from a dragged all-day range', async () => {
+  vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+  vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+  vi.mocked(calendarApi.createCalendarTask).mockResolvedValue({id: 100} as never);
+
+  renderCalendarPanelWithSidebarTasks();
+
+  fireEvent.pointerDown(screen.getByLabelText('2026-06-06 全天'), {clientX: 60, clientY: 20});
+  fireEvent.pointerUp(screen.getByLabelText('2026-06-04 全天'), {clientX: 10, clientY: 20});
+
+  expect(await screen.findByRole('dialog', {name: '快速创建任务'})).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('任务标题'), {target: {value: '跨天事项'}});
+  fireEvent.click(screen.getByRole('button', {name: '保存'}));
+
+  await waitFor(() => expect(calendarApi.createCalendarTask).toHaveBeenCalledWith(expect.objectContaining({
+    title: '跨天事项',
+    categoryId: 1,
+    plannedDate: '2026-06-04',
+    plannedEndDate: '2026-06-06',
+    allDay: true,
+  })));
+});
+
+it('quick creates a single-day all-day task without plannedEndDate', async () => {
+  vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+  vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+  vi.mocked(calendarApi.createCalendarTask).mockResolvedValue({id: 101} as never);
+
+  renderCalendarPanelWithSidebarTasks();
+
+  fireEvent.pointerDown(screen.getByLabelText('2026-06-06 全天'), {clientX: 60, clientY: 20});
+  fireEvent.pointerUp(screen.getByLabelText('2026-06-06 全天'), {clientX: 60, clientY: 20});
+
+  expect(await screen.findByRole('dialog', {name: '快速创建任务'})).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('任务标题'), {target: {value: '单日事项'}});
+  fireEvent.click(screen.getByRole('button', {name: '保存'}));
+
+  await waitFor(() => expect(calendarApi.createCalendarTask).toHaveBeenCalledWith(expect.objectContaining({
+    title: '单日事项',
+    categoryId: 1,
+    plannedDate: '2026-06-06',
+    plannedEndDate: undefined,
+    allDay: true,
+  })));
+});
+
 it('keeps quick create popover input when create fails', async () => {
   vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
   vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
   vi.mocked(calendarApi.createCalendarTask).mockRejectedValue(new Error('创建失败'));
 
   renderCalendarPanelWithSidebarTasks();
+  const slot = screen.getByLabelText('2026-06-06 09:00');
+  mockElementRect(slot, {top: 100, height: 64});
 
-  fireEvent.pointerDown(screen.getByLabelText('2026-06-06 09:00'), {clientX: 100, clientY: 100});
-  fireEvent.pointerUp(screen.getByLabelText('2026-06-06 09:00'), {clientX: 100, clientY: 100});
+  fireEvent.pointerDown(slot, {clientX: 100, clientY: 100});
+  fireEvent.pointerUp(slot, {clientX: 100, clientY: 100});
   fireEvent.change(await screen.findByLabelText('任务标题'), {target: {value: '写方案'}});
   fireEvent.click(screen.getByRole('button', {name: '保存'}));
 
@@ -1472,9 +1814,9 @@ it('does not render fake tag or priority tabs in the scheduling sidebar', async 
 });
 ```
 
-- [ ] **Step 2: Write failing EmbeddedCalendarPanel tests**
+- [ ] **Step 2: Write EmbeddedCalendarPanel regression tests**
 
-Append to `EmbeddedCalendarPanel.test.tsx`:
+Append to `EmbeddedCalendarPanel.test.tsx`. This regression test may already pass before implementation; keep it to prevent full-calendar-only controls from leaking into embedded calendars.
 
 ```tsx
 it('does not show full-calendar planning controls', async () => {
@@ -1498,7 +1840,7 @@ Run:
 npm test -- src/modules/calendar/components/CalendarPanel.test.tsx src/modules/calendar/components/EmbeddedCalendarPanel.test.tsx
 ```
 
-Expected: FAIL because toolbar capabilities, popover integration, and sidebar toggle do not exist.
+Expected: FAIL because toolbar capabilities, popover integration, and sidebar toggle do not exist. If only the regression assertions pass, continue; at least one quick-create or toolbar capability assertion must fail before implementation.
 
 - [ ] **Step 4: Add CalendarToolbar capability props**
 
@@ -1554,6 +1896,18 @@ className={schedulingSidebarOpen ? 'grid grid-cols-1 gap-4 xl:grid-cols-[minmax(
 
 - Render `CalendarQuickCreatePopover` when `controller.quickCreateDraft`.
 - Pass `controller.submitQuickCreateDraft` and `controller.closeQuickCreateDraft`.
+- Pass full-calendar planning capabilities to `CalendarSurface`:
+
+```tsx
+<CalendarSurface
+  controller={controller}
+  categories={categories}
+  enableQuickCreate
+  weekTimelineDensity={controller.settings.weekTimelineDensity}
+  onOpenQuickCreate={controller.openQuickCreateDraft}
+  onRejectBatchTimeDrop={() => showToast('多选任务不能直接安排到时间段', 'error')}
+/>
+```
 
 - [ ] **Step 6: Wire CalendarSurface and EmbeddedCalendarPanel**
 
@@ -1610,7 +1964,6 @@ npm test -- \
   src/modules/calendar/controllers/useCalendarController.test.ts \
   src/modules/calendar/controllers/useTaskSchedulingActions.test.ts \
   src/modules/calendar/controllers/calendarLayout.test.ts \
-  src/modules/calendar/controllers/weekTimelineLayout.test.ts \
   src/modules/calendar/components/CalendarQuickCreatePopover.test.tsx \
   src/modules/calendar/components/WeekTimelineView.test.tsx \
   src/modules/calendar/components/CalendarPanel.test.tsx \
@@ -1654,17 +2007,20 @@ Expected: PASS.
 Run:
 
 ```bash
+BASE_SHA=$(cat .git/week-planning-efficiency-base)
+git diff --check "$BASE_SHA"..HEAD
 git diff --check
 ```
 
-Expected: no output.
+Expected: both commands produce no output.
 
 - [ ] **Step 6: Review changed file boundaries**
 
 Run:
 
 ```bash
-git diff --stat HEAD~7..HEAD
+BASE_SHA=$(cat .git/week-planning-efficiency-base)
+git diff --stat "$BASE_SHA"..HEAD
 git status --short
 ```
 
@@ -1705,10 +2061,12 @@ Spec coverage:
 - Scheduling sidebar entry/close state: Task 7.
 - Full vs embedded capability boundary: Task 7.
 - Cross-day all-day continuous week display: Task 5.
+- Create/resize failure handling and refresh behavior: Tasks 3, 4, 6, 7.
+- Base-SHA execution boundary and final diff review: Tasks 0, 8.
 - No fake tags/priority UI: Task 7.
 - Regression verification: Task 8.
 
-Placeholder scan: no `TBD`, `TODO`, or "implement later" placeholders are intended in this plan.
+Placeholder scan: no `TBD`, `FIXME`, `<changed-files>`, or "implement later" placeholders are intended in this plan. `status: 'TODO'` appears only as a real task status enum in test data.
 
 Type consistency:
 
@@ -1716,3 +2074,4 @@ Type consistency:
 - `CalendarQuickCreateDraft` has `timed` and `all-day` variants.
 - `calendarApi.createCalendarTask` accepts the same fields as `tasksApi.createTask` needs for scheduled tasks.
 - `useCalendarController` owns quick-create draft state and exposes `openQuickCreateDraft`, `closeQuickCreateDraft`, `submitQuickCreateDraft`, and `setWeekTimelineDensity`.
+- `WeekAllDaySegment` includes `rowIndex` so overlapping all-day spans do not stack visually.
