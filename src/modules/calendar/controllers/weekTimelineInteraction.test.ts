@@ -8,6 +8,7 @@ import {
   canResizeTimedTask,
   getResizeDurationMinutes,
   hourHeightForDensity,
+  validateTimedRangeWithinBounds,
 } from './weekTimelineInteraction';
 
 describe('weekTimelineInteraction', () => {
@@ -22,7 +23,7 @@ describe('weekTimelineInteraction', () => {
     expect(hourHeightForDensity('comfortable')).toBe(88);
   });
 
-  it('creates a default 60 minute timed draft from a point', () => {
+  it('creates a default hour-bounded timed draft from a point', () => {
     expect(buildTimedQuickCreateDraftFromPoint({
       date: '2026-06-06',
       hour: 9,
@@ -33,13 +34,50 @@ describe('weekTimelineInteraction', () => {
     })).toEqual({
       kind: 'timed',
       plannedDate: '2026-06-06',
-      startAt: '2026-06-06T09:30:00.000',
-      endAt: '2026-06-06T10:30:00.000',
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+      editableStartAt: '2026-06-06T09:00:00.000',
+      editableEndAt: '2026-06-06T10:00:00.000',
       anchor: {x: 20, y: 132},
     });
   });
 
-  it('clamps late point creation to 23:44-23:59', () => {
+  it('uses the clicked hour as point quick-create editable bounds and default range', () => {
+    expect(buildTimedQuickCreateDraftFromPoint({
+      date: '2026-06-06',
+      hour: 9,
+      clientY: 132,
+      rectTop: 100,
+      hourHeight: 64,
+      anchor: {x: 20, y: 132},
+    })).toEqual({
+      kind: 'timed',
+      plannedDate: '2026-06-06',
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+      editableStartAt: '2026-06-06T09:00:00.000',
+      editableEndAt: '2026-06-06T10:00:00.000',
+      anchor: {x: 20, y: 132},
+    });
+  });
+
+  it('clamps final-hour point quick-create bounds and default range to 23:59', () => {
+    expect(buildTimedQuickCreateDraftFromPoint({
+      date: '2026-06-06',
+      hour: 23,
+      clientY: 132,
+      rectTop: 100,
+      hourHeight: 64,
+      anchor: {x: 20, y: 132},
+    })).toMatchObject({
+      startAt: '2026-06-06T23:00:00.000',
+      endAt: '2026-06-06T23:59:00.000',
+      editableStartAt: '2026-06-06T23:00:00.000',
+      editableEndAt: '2026-06-06T23:59:00.000',
+    });
+  });
+
+  it('clamps late point creation to the final hour range', () => {
     expect(buildTimedQuickCreateDraftFromPoint({
       date: '2026-06-06',
       hour: 23,
@@ -48,8 +86,10 @@ describe('weekTimelineInteraction', () => {
       hourHeight: 64,
       anchor: {x: 20, y: 163},
     })).toMatchObject({
-      startAt: '2026-06-06T23:44:00.000',
+      startAt: '2026-06-06T23:00:00.000',
       endAt: '2026-06-06T23:59:00.000',
+      editableStartAt: '2026-06-06T23:00:00.000',
+      editableEndAt: '2026-06-06T23:59:00.000',
     });
   });
 
@@ -62,8 +102,10 @@ describe('weekTimelineInteraction', () => {
       hourHeight: 64,
       anchor: {x: 20, y: 132},
     })).toMatchObject({
-      startAt: '2026-06-06T00:30:00.000',
-      endAt: '2026-06-06T01:30:00.000',
+      startAt: '2026-06-06T00:00:00.000',
+      endAt: '2026-06-06T01:00:00.000',
+      editableStartAt: '2026-06-06T00:00:00.000',
+      editableEndAt: '2026-06-06T01:00:00.000',
     });
   });
 
@@ -78,6 +120,8 @@ describe('weekTimelineInteraction', () => {
     })).toMatchObject({
       startAt: '2026-06-06T09:00:00.000',
       endAt: '2026-06-06T10:00:00.000',
+      editableStartAt: '2026-06-06T09:00:00.000',
+      editableEndAt: '2026-06-06T10:00:00.000',
     });
   });
 
@@ -113,6 +157,57 @@ describe('weekTimelineInteraction', () => {
       startAt: '2026-06-06T10:30:00.000',
       endAt: '2026-06-06T12:00:00.000',
     });
+  });
+
+  it('uses normalized drag range as timed quick-create editable bounds', () => {
+    expect(buildTimedQuickCreateDraftFromDrag({
+      date: '2026-06-06',
+      startHour: 12,
+      startClientY: 100,
+      endHour: 10,
+      endClientY: 132,
+      startRectTop: 100,
+      endRectTop: 100,
+      hourHeight: 64,
+      anchor: {x: 40, y: 100},
+    })).toMatchObject({
+      startAt: '2026-06-06T10:30:00.000',
+      endAt: '2026-06-06T12:00:00.000',
+      editableStartAt: '2026-06-06T10:30:00.000',
+      editableEndAt: '2026-06-06T12:00:00.000',
+    });
+  });
+
+  it('validates candidate timed ranges inside editable bounds', () => {
+    expect(validateTimedRangeWithinBounds({
+      startAt: '2026-06-06T09:15:00.000',
+      endAt: '2026-06-06T09:45:00.000',
+      editableStartAt: '2026-06-06T09:00:00.000',
+      editableEndAt: '2026-06-06T10:00:00.000',
+    })).toEqual({ok: true});
+  });
+
+  it('rejects invalid timed ranges with stable messages', () => {
+    expect(validateTimedRangeWithinBounds({
+      startAt: '2026-06-06T09:45:00.000',
+      endAt: '2026-06-06T09:45:00.000',
+      editableStartAt: '2026-06-06T09:00:00.000',
+      editableEndAt: '2026-06-06T10:00:00.000',
+    })).toEqual({ok: false, message: '结束时间必须晚于开始时间'});
+
+    expect(validateTimedRangeWithinBounds({
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T09:10:00.000',
+      editableStartAt: '2026-06-06T09:00:00.000',
+      editableEndAt: '2026-06-06T10:00:00.000',
+    })).toEqual({ok: false, message: '任务时长不能少于 15 分钟'});
+
+    expect(validateTimedRangeWithinBounds({
+      startAt: '2026-06-06T08:45:00.000',
+      endAt: '2026-06-06T09:30:00.000',
+      editableStartAt: '2026-06-06T09:00:00.000',
+      editableEndAt: '2026-06-06T10:00:00.000',
+    })).toEqual({ok: false, message: '只能在 09:00-10:00 内调整'});
   });
 
   it('keeps dragged timed drafts at least 15 minutes', () => {

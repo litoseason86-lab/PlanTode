@@ -24,6 +24,8 @@ export type CalendarQuickCreateDraft =
       plannedDate: string;
       startAt: string;
       endAt: string;
+      editableStartAt: string;
+      editableEndAt: string;
       anchor: PopoverAnchor;
     }
   | {
@@ -61,6 +63,59 @@ function makeDateTimeFromMinute(date: string, minuteOfDay: number): string {
   return makeLocalDateTime(date, Math.floor(clamped / 60), clamped % 60);
 }
 
+interface TimedRangeValidationInput {
+  startAt: string;
+  endAt: string;
+  editableStartAt: string;
+  editableEndAt: string;
+}
+
+export type TimedRangeValidationResult = {ok: true} | {ok: false; message: string};
+
+function minuteOfDayFromLocalDateTime(value: string): number | null {
+  if (!isLocalDateTimeString(value)) {
+    return null;
+  }
+
+  return Number(value.slice(11, 13)) * 60 + Number(value.slice(14, 16));
+}
+
+function formatMinuteOfDay(minuteOfDay: number): string {
+  const hour = Math.floor(minuteOfDay / 60);
+  const minute = minuteOfDay % 60;
+
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+export function validateTimedRangeWithinBounds(input: TimedRangeValidationInput): TimedRangeValidationResult {
+  const start = minuteOfDayFromLocalDateTime(input.startAt);
+  const end = minuteOfDayFromLocalDateTime(input.endAt);
+  const boundStart = minuteOfDayFromLocalDateTime(input.editableStartAt);
+  const boundEnd = minuteOfDayFromLocalDateTime(input.editableEndAt);
+
+  if (start === null || end === null || boundStart === null || boundEnd === null) {
+    return {ok: false, message: '时间格式无效'};
+  }
+
+  if (input.startAt.slice(0, 10) !== input.endAt.slice(0, 10)) {
+    return {ok: false, message: '只能在 00:00-23:59 内调整'};
+  }
+
+  if (end <= start) {
+    return {ok: false, message: '结束时间必须晚于开始时间'};
+  }
+
+  if (end - start < MIN_TIMED_TASK_DURATION_MINUTES) {
+    return {ok: false, message: '任务时长不能少于 15 分钟'};
+  }
+
+  if (start < boundStart || end > boundEnd) {
+    return {ok: false, message: `只能在 ${formatMinuteOfDay(boundStart)}-${formatMinuteOfDay(boundEnd)} 内调整`};
+  }
+
+  return {ok: true};
+}
+
 export function buildTimedQuickCreateDraftFromPoint(input: {
   date: string;
   hour: number;
@@ -69,17 +124,18 @@ export function buildTimedQuickCreateDraftFromPoint(input: {
   hourHeight: number;
   anchor: PopoverAnchor;
 }): CalendarQuickCreateDraft {
-  const startMinute = minuteFromPointer(input);
+  const hour = Number.isFinite(input.hour) ? Math.floor(input.hour) : 0;
+  const hourWithinDay = Math.min(23, Math.max(0, hour));
+  const startMinute = clampStartMinute(hourWithinDay * 60);
   const endMinute = Math.min(END_OF_DAY_MINUTES, startMinute + DEFAULT_TIMED_TASK_DURATION_MINUTES);
-  const adjustedStart = endMinute - startMinute < MIN_TIMED_TASK_DURATION_MINUTES
-    ? Math.max(0, endMinute - MIN_TIMED_TASK_DURATION_MINUTES)
-    : startMinute;
 
   return {
     kind: 'timed',
     plannedDate: input.date,
-    startAt: makeDateTimeFromMinute(input.date, adjustedStart),
+    startAt: makeDateTimeFromMinute(input.date, startMinute),
     endAt: makeDateTimeFromMinute(input.date, endMinute),
+    editableStartAt: makeDateTimeFromMinute(input.date, startMinute),
+    editableEndAt: makeDateTimeFromMinute(input.date, endMinute),
     anchor: input.anchor,
   };
 }
@@ -122,6 +178,8 @@ export function buildTimedQuickCreateDraftFromDrag(input: {
     plannedDate: input.date,
     startAt: makeDateTimeFromMinute(input.date, rangeStart),
     endAt: makeDateTimeFromMinute(input.date, rangeEnd),
+    editableStartAt: makeDateTimeFromMinute(input.date, rangeStart),
+    editableEndAt: makeDateTimeFromMinute(input.date, rangeEnd),
     anchor: input.anchor,
   };
 }

@@ -15,6 +15,8 @@ const timedDraft: CalendarQuickCreateDraft = {
   plannedDate: '2026-06-06',
   startAt: '2026-06-06T09:00:00.000',
   endAt: '2026-06-06T10:00:00.000',
+  editableStartAt: '2026-06-06T09:00:00.000',
+  editableEndAt: '2026-06-06T10:00:00.000',
   anchor: {x: 30, y: 40},
 };
 

@@ -2,6 +2,7 @@ import {act, renderHook, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {calendarApi} from '../api/calendarApi';
+import type {CalendarQuickCreateDraft} from './weekTimelineInteraction';
 import {useCalendarController} from './useCalendarController';
 
 vi.mock('../api/calendarApi', () => ({
@@ -16,6 +17,19 @@ vi.mock('../api/calendarApi', () => ({
     batchUnschedule: vi.fn(),
   },
 }));
+
+function timedQuickCreateDraft(overrides: Partial<Extract<CalendarQuickCreateDraft, {kind: 'timed'}>> = {}): CalendarQuickCreateDraft {
+  return {
+    kind: 'timed',
+    plannedDate: '2026-06-06',
+    startAt: '2026-06-06T09:00:00.000',
+    endAt: '2026-06-06T10:00:00.000',
+    editableStartAt: '2026-06-06T09:00:00.000',
+    editableEndAt: '2026-06-06T10:00:00.000',
+    anchor: {x: 10, y: 20},
+    ...overrides,
+  };
+}
 
 describe('useCalendarController', () => {
   afterEach(() => {
@@ -395,13 +409,7 @@ describe('useCalendarController', () => {
       showToast: vi.fn(),
     }));
 
-    act(() => result.current.openQuickCreateDraft({
-      kind: 'timed',
-      plannedDate: '2026-06-06',
-      startAt: '2026-06-06T09:00:00.000',
-      endAt: '2026-06-06T10:00:00.000',
-      anchor: {x: 10, y: 20},
-    }));
+    act(() => result.current.openQuickCreateDraft(timedQuickCreateDraft()));
 
     expect(result.current.quickCreateDraft).toMatchObject({kind: 'timed'});
 
@@ -420,13 +428,7 @@ describe('useCalendarController', () => {
       showToast: vi.fn(),
     }));
 
-    act(() => result.current.openQuickCreateDraft({
-      kind: 'timed',
-      plannedDate: '2026-06-06',
-      startAt: '2026-06-06T09:00:00.000',
-      endAt: '2026-06-06T10:00:00.000',
-      anchor: {x: 10, y: 20},
-    }));
+    act(() => result.current.openQuickCreateDraft(timedQuickCreateDraft()));
 
     await act(async () => {
       const resultValue = await result.current.submitQuickCreateDraft({
@@ -500,13 +502,7 @@ describe('useCalendarController', () => {
       showToast: vi.fn(),
     }));
 
-    act(() => result.current.openQuickCreateDraft({
-      kind: 'timed',
-      plannedDate: '2026-06-06',
-      startAt: '2026-06-06T09:00:00.000',
-      endAt: '2026-06-06T10:00:00.000',
-      anchor: {x: 10, y: 20},
-    }));
+    act(() => result.current.openQuickCreateDraft(timedQuickCreateDraft()));
 
     await act(async () => {
       await expect(result.current.submitQuickCreateDraft({
@@ -532,13 +528,7 @@ describe('useCalendarController', () => {
       showToast: vi.fn(),
     }));
 
-    act(() => result.current.openQuickCreateDraft({
-      kind: 'timed',
-      plannedDate: '2026-06-06',
-      startAt: '2026-06-06T09:00:00.000',
-      endAt: '2026-06-06T10:00:00.000',
-      anchor: {x: 10, y: 20},
-    }));
+    act(() => result.current.openQuickCreateDraft(timedQuickCreateDraft()));
 
     const submitPromise = result.current.submitQuickCreateDraft({
       title: '写方案',
@@ -574,13 +564,7 @@ describe('useCalendarController', () => {
       showToast,
     }));
 
-    act(() => result.current.openQuickCreateDraft({
-      kind: 'timed',
-      plannedDate: '2026-06-06',
-      startAt: '2026-06-06T09:00:00.000',
-      endAt: '2026-06-06T10:00:00.000',
-      anchor: {x: 10, y: 20},
-    }));
+    act(() => result.current.openQuickCreateDraft(timedQuickCreateDraft()));
 
     await act(async () => {
       await expect(result.current.submitQuickCreateDraft({
@@ -607,13 +591,7 @@ describe('useCalendarController', () => {
       onMutationSuccess,
     }));
 
-    act(() => result.current.openQuickCreateDraft({
-      kind: 'timed',
-      plannedDate: '2026-06-06',
-      startAt: '2026-06-06T09:00:00.000',
-      endAt: '2026-06-06T10:00:00.000',
-      anchor: {x: 10, y: 20},
-    }));
+    act(() => result.current.openQuickCreateDraft(timedQuickCreateDraft()));
 
     await act(async () => {
       await expect(result.current.submitQuickCreateDraft({
