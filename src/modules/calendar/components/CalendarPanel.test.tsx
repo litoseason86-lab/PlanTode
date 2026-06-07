@@ -26,6 +26,30 @@ function createDragData() {
   } as unknown as DataTransfer;
 }
 
+function mockElementRect(element: HTMLElement, rect: Partial<DOMRect>) {
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+    width: rect.width ?? 1024,
+    height: rect.height ?? 64,
+    top: rect.top ?? 0,
+    left: rect.left ?? 0,
+    right: rect.right ?? 1024,
+    bottom: rect.bottom ?? (rect.top ?? 0) + (rect.height ?? 64),
+    x: rect.left ?? 0,
+    y: rect.top ?? 0,
+    toJSON() { return this; },
+  } as DOMRect);
+}
+
+function dispatchElementPointerDown(element: Element, clientY: number, clientX = 0) {
+  element.dispatchEvent(new MouseEvent('pointerdown', {bubbles: true, clientX, clientY}));
+}
+
+function dispatchElementPointerUp(element: Element, clientY: number, clientX = 0) {
+  element.dispatchEvent(new MouseEvent('pointerup', {bubbles: true, clientX, clientY}));
+}
+
+const CALENDAR_SETTINGS_STORAGE_KEY = 'plantodo.calendar.settings';
+
 function renderCalendarPanel(overrides: Partial<Parameters<typeof CalendarPanel>[0]> = {}) {
   return render(
     <CalendarPanel
@@ -113,7 +137,7 @@ describe('CalendarPanel', () => {
     const data = createDragData();
     fireEvent.dragStart(screen.getByLabelText('拖拽 未安排任务'), {dataTransfer: data});
     fireEvent.drop(screen.getByLabelText('2026-06-06 09:00'), {dataTransfer: data});
-    expect(showToast).toHaveBeenCalledWith('批量任务只能安排到日期', 'error');
+    expect(showToast).toHaveBeenCalledWith('多选任务不能直接安排到时间段', 'error');
   });
 
   it('runs app-level mutation refresh after calendar scheduling succeeds', async () => {
@@ -658,5 +682,153 @@ describe('CalendarPanel', () => {
     fireEvent.click(screen.getByLabelText('显示专注记录'));
 
     expect(screen.queryByText('专注 30m')).not.toBeInTheDocument();
+  });
+
+  it('opens and closes scheduling sidebar from toolbar', async () => {
+    renderCalendarPanelWithSidebarTasks();
+
+    expect(await screen.findByRole('button', {name: '关闭安排任务'})).toBeInTheDocument();
+    expect(await screen.findByText('未安排任务')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: '关闭安排任务'}));
+
+    await waitFor(() => expect(screen.queryByText('未安排任务')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', {name: '安排任务'}));
+
+    expect(await screen.findByText('未安排任务')).toBeInTheDocument();
+  });
+
+  it('does not persist scheduling sidebar open state to localStorage', async () => {
+    renderCalendarPanelWithSidebarTasks();
+
+    fireEvent.click(await screen.findByRole('button', {name: '关闭安排任务'}));
+
+    const settings = localStorage.getItem(CALENDAR_SETTINGS_STORAGE_KEY) ?? '';
+    expect(settings).not.toContain('schedulingSidebar');
+    expect(settings).not.toContain('sidebarOpen');
+  });
+
+  it('quick creates timed task from week timeline', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.getUnscheduledTasks)
+      .mockResolvedValueOnce([
+        {id: 10, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+      ] as never)
+      .mockResolvedValue([] as never);
+    vi.mocked(calendarApi.createCalendarTask).mockResolvedValue({id: 99} as never);
+    renderCalendarPanel({onMutationSuccess: vi.fn().mockResolvedValue(undefined)});
+
+    await screen.findByText('未安排任务');
+    const slot = screen.getByLabelText('2026-06-06 09:00');
+    mockElementRect(slot, {top: 0, height: 64});
+    act(() => {
+      dispatchElementPointerDown(slot, 0, 120);
+      dispatchElementPointerUp(slot, 0, 120);
+    });
+
+    expect(await screen.findByRole('dialog', {name: '快速创建任务'})).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('任务标题'), {target: {value: '写周计划'}});
+    fireEvent.click(screen.getByRole('button', {name: '保存'}));
+
+    await waitFor(() => expect(calendarApi.createCalendarTask).toHaveBeenCalledWith(expect.objectContaining({
+      title: '写周计划',
+      categoryId: 1,
+      plannedDate: '2026-06-06',
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+      allDay: false,
+    })));
+    await waitFor(() => expect(calendarApi.getUnscheduledTasks).toHaveBeenCalledTimes(2));
+  });
+
+  it('quick creates cross-day all-day task from dragged all-day range', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.createCalendarTask).mockResolvedValue({id: 99} as never);
+    renderCalendarPanelWithSidebarTasks();
+
+    const start = screen.getByLabelText('2026-06-06 全天');
+    const end = screen.getByLabelText('2026-06-04 全天');
+    act(() => {
+      dispatchElementPointerDown(start, 12, 120);
+      dispatchElementPointerUp(end, 12, 80);
+    });
+
+    expect(await screen.findByRole('dialog', {name: '快速创建任务'})).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('任务标题'), {target: {value: '跨天任务'}});
+    fireEvent.click(screen.getByRole('button', {name: '保存'}));
+
+    await waitFor(() => expect(calendarApi.createCalendarTask).toHaveBeenCalledWith(expect.objectContaining({
+      title: '跨天任务',
+      categoryId: 1,
+      plannedDate: '2026-06-04',
+      plannedEndDate: '2026-06-06',
+      allDay: true,
+    })));
+  });
+
+  it('quick creates single-day all-day task without plannedEndDate', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.createCalendarTask).mockResolvedValue({id: 99} as never);
+    renderCalendarPanelWithSidebarTasks();
+
+    const day = screen.getByLabelText('2026-06-06 全天');
+    act(() => {
+      dispatchElementPointerDown(day, 12, 120);
+      dispatchElementPointerUp(day, 12, 120);
+    });
+
+    expect(await screen.findByRole('dialog', {name: '快速创建任务'})).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('任务标题'), {target: {value: '全天单日'}});
+    fireEvent.click(screen.getByRole('button', {name: '保存'}));
+
+    await waitFor(() => expect(calendarApi.createCalendarTask).toHaveBeenCalledWith(expect.objectContaining({
+      title: '全天单日',
+      categoryId: 1,
+      plannedDate: '2026-06-06',
+      plannedEndDate: undefined,
+      allDay: true,
+    })));
+  });
+
+  it('keeps quick-create popover input when create fails', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.createCalendarTask).mockRejectedValue(new Error('创建失败'));
+    renderCalendarPanelWithSidebarTasks();
+
+    const slot = screen.getByLabelText('2026-06-06 09:00');
+    mockElementRect(slot, {top: 0, height: 64});
+    act(() => {
+      dispatchElementPointerDown(slot, 0, 120);
+      dispatchElementPointerUp(slot, 0, 120);
+    });
+
+    expect(await screen.findByRole('dialog', {name: '快速创建任务'})).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('任务标题'), {target: {value: '保留输入'}});
+    fireEvent.click(screen.getByRole('button', {name: '保存'}));
+
+    expect(await screen.findByText('创建失败')).toBeInTheDocument();
+    expect(screen.getByLabelText('任务标题')).toHaveValue('保留输入');
+  });
+
+  it('changes week timeline density from toolbar', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    renderCalendarPanel();
+
+    fireEvent.click(await screen.findByRole('button', {name: '宽松'}));
+
+    expect(screen.getByLabelText('2026-06-06 09:00')).toHaveStyle({height: '88px'});
+  });
+
+  it('does not render fake tag or priority tabs in scheduling sidebar', async () => {
+    renderCalendarPanelWithSidebarTasks();
+
+    expect(await screen.findByText('未安排任务')).toBeInTheDocument();
+    expect(screen.queryByText('标签')).not.toBeInTheDocument();
+    expect(screen.queryByText('优先级')).not.toBeInTheDocument();
   });
 });

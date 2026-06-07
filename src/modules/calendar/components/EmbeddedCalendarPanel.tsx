@@ -25,13 +25,13 @@ export function EmbeddedCalendarPanel({
         anchorDate={controller.anchorDate}
         setView={controller.setView}
         setAnchorDate={controller.setAnchorDate}
-        onOpenSettings={() => undefined}
       />
       <div className="overflow-x-auto">
         <CalendarSurface
           controller={controller}
           categories={categories}
           embedded
+          enableQuickCreate={false}
           onRejectBatchTimeDrop={() => showToast('批量任务只能安排到日期', 'error')}
         />
       </div>

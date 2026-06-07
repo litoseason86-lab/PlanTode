@@ -1,5 +1,6 @@
 import type {Category} from '../../../../shared/domain/entities';
 import type {useCalendarController} from '../controllers/useCalendarController';
+import type {CalendarQuickCreateDraft, WeekTimelineDensity} from '../controllers/weekTimelineInteraction';
 import {CalendarListView} from './CalendarListView';
 import {MonthCalendarView} from './MonthCalendarView';
 import {WeekTimelineView} from './WeekTimelineView';
@@ -9,9 +10,20 @@ interface CalendarSurfaceProps {
   categories: Category[];
   embedded?: boolean;
   onRejectBatchTimeDrop: () => void;
+  enableQuickCreate?: boolean;
+  weekTimelineDensity?: WeekTimelineDensity;
+  onOpenQuickCreate?: (draft: CalendarQuickCreateDraft) => void;
 }
 
-export function CalendarSurface({controller, categories, embedded = false, onRejectBatchTimeDrop}: CalendarSurfaceProps) {
+export function CalendarSurface({
+  controller,
+  categories,
+  embedded = false,
+  onRejectBatchTimeDrop,
+  enableQuickCreate = false,
+  weekTimelineDensity = 'standard',
+  onOpenQuickCreate = () => {},
+}: CalendarSurfaceProps) {
   return (
     <div className={embedded ? 'min-w-0' : undefined}>
       {controller.view === 'month' && (
@@ -37,6 +49,9 @@ export function CalendarSurface({controller, categories, embedded = false, onRej
           onMoveTimedTask={controller.moveTimedTask}
           onResizeTimedTask={controller.resizeTimedTask}
           onRejectBatchTimeDrop={onRejectBatchTimeDrop}
+          enableQuickCreate={enableQuickCreate}
+          weekTimelineDensity={weekTimelineDensity}
+          onOpenQuickCreate={onOpenQuickCreate}
         />
       )}
       {controller.view === 'list' && (

@@ -3,6 +3,7 @@ import {type CSSProperties, useState} from 'react';
 import type {Category} from '../../../../shared/domain/entities';
 import {useCalendarController} from '../controllers/useCalendarController';
 import {useSchedulingSidebarController} from '../controllers/useSchedulingSidebarController';
+import {CalendarQuickCreatePopover} from './CalendarQuickCreatePopover';
 import {CalendarSurface} from './CalendarSurface';
 import {CalendarSettingsMenu} from './CalendarSettingsMenu';
 import {CalendarToolbar} from './CalendarToolbar';
@@ -19,6 +20,7 @@ interface CalendarPanelProps {
 export function CalendarPanel({categories, styleContext, showToast, initialDate, onMutationSuccess}: CalendarPanelProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
+  const [schedulingSidebarOpen, setSchedulingSidebarOpen] = useState(true);
   const controller = useCalendarController({
     categories,
     initialDate,
@@ -47,6 +49,12 @@ export function CalendarPanel({categories, styleContext, showToast, initialDate,
         setView={controller.setView}
         setAnchorDate={controller.setAnchorDate}
         onOpenSettings={() => setSettingsOpen((open) => !open)}
+        showSchedulingToggle
+        schedulingSidebarOpen={schedulingSidebarOpen}
+        onToggleSchedulingSidebar={() => setSchedulingSidebarOpen((open) => !open)}
+        showWeekDensityControls
+        weekTimelineDensity={controller.settings.weekTimelineDensity}
+        onWeekTimelineDensityChange={controller.setWeekTimelineDensity}
       />
       {settingsOpen && (
         <CalendarSettingsMenu
@@ -56,19 +64,32 @@ export function CalendarPanel({categories, styleContext, showToast, initialDate,
         />
       )}
       <div style={{'--calendar-accent': styleContext.primary} as CSSProperties}>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className={schedulingSidebarOpen ? 'grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]' : 'grid grid-cols-1 gap-4'}>
           <div className="min-w-0">
             <CalendarSurface
               controller={controller}
               categories={categories}
-              onRejectBatchTimeDrop={() => showToast('批量任务只能安排到日期', 'error')}
+              enableQuickCreate
+              weekTimelineDensity={controller.settings.weekTimelineDensity}
+              onOpenQuickCreate={controller.openQuickCreateDraft}
+              onRejectBatchTimeDrop={() => showToast('多选任务不能直接安排到时间段', 'error')}
             />
           </div>
-          <SchedulingSidebar
-            controller={sidebarController}
-            categories={categories}
-          />
+          {schedulingSidebarOpen && (
+            <SchedulingSidebar
+              controller={sidebarController}
+              categories={categories}
+            />
+          )}
         </div>
+        {controller.quickCreateDraft && (
+          <CalendarQuickCreatePopover
+            draft={controller.quickCreateDraft}
+            categories={categories}
+            onCancel={controller.closeQuickCreateDraft}
+            onSubmit={controller.submitQuickCreateDraft}
+          />
+        )}
       </div>
     </section>
   );

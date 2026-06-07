@@ -40,6 +40,17 @@ describe('EmbeddedCalendarPanel', () => {
     expect(screen.queryByText('安排任务')).not.toBeInTheDocument();
   });
 
+  it('hides full-calendar-only toolbar controls', () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    render(<EmbeddedCalendarPanel categories={categories} initialDate="2026-06-06" showToast={vi.fn()} onMutationSuccess={vi.fn()} />);
+
+    expect(screen.queryByRole('button', {name: '安排任务'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '紧凑'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '标准'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '宽松'})).not.toBeInTheDocument();
+  });
+
   it('schedules a task-list payload dropped onto an embedded month date', async () => {
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
