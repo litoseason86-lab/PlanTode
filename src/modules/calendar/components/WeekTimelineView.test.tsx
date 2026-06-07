@@ -168,6 +168,38 @@ describe('WeekTimelineView', () => {
     }));
   });
 
+  it('opens all-day quick create when a dragged range ends on an existing segment', () => {
+    const onOpenQuickCreate = vi.fn();
+    renderWeek({
+      enableQuickCreate: true,
+      onOpenQuickCreate,
+      tasksByDate: {
+        '2026-06-04': [{
+          ...task,
+          id: 2,
+          title: '跨天任务',
+          plannedDate: '2026-06-04',
+          plannedEndDate: '2026-06-05',
+        }],
+      },
+    });
+    const segment = screen.getByLabelText('2026-06-04 至 2026-06-05 跨天任务');
+    const segmentLayer = segment.parentElement;
+    expect(segmentLayer).not.toBeNull();
+    mockElementRect(segmentLayer as HTMLElement, {left: 0, width: 764});
+
+    act(() => {
+      dispatchElementPointerDown(screen.getByLabelText('2026-06-03 全天'), 20, 100);
+      dispatchElementPointerUp(segment, 20, 414);
+    });
+
+    expect(onOpenQuickCreate).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'all-day',
+      plannedDate: '2026-06-03',
+      plannedEndDate: '2026-06-04',
+    }));
+  });
+
   it('does not open quick create for external drop payloads', () => {
     const onOpenQuickCreate = vi.fn();
     renderWeek({enableQuickCreate: true, onOpenQuickCreate});

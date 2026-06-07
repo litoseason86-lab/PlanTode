@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 
 import type {Category} from '../../../../shared/domain/entities';
 import type {CalendarQuickCreateDraft} from '../controllers/weekTimelineInteraction';
@@ -10,6 +10,10 @@ interface CalendarQuickCreatePopoverProps {
   onSubmit: (input: {title: string; categoryId: number}) => Promise<{ok: true} | {ok: false; message: string}>;
 }
 
+const POPOVER_MARGIN_PX = 12;
+const POPOVER_FALLBACK_WIDTH_PX = 288;
+const POPOVER_FALLBACK_HEIGHT_PX = 220;
+
 function formatDraftRange(draft: CalendarQuickCreateDraft): string {
   if (draft.kind === 'timed') {
     return `${draft.startAt.slice(11, 16)} - ${draft.endAt.slice(11, 16)}`;
@@ -17,6 +21,26 @@ function formatDraftRange(draft: CalendarQuickCreateDraft): string {
 
   const endDate = draft.plannedEndDate ?? draft.plannedDate;
   return `${draft.plannedDate.slice(5, 10)} - ${endDate.slice(5, 10)}`;
+}
+
+function clampPopoverPosition(input: {
+  anchor: {x: number; y: number};
+  width: number;
+  height: number;
+}): {x: number; y: number} {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  if (viewportWidth <= 0 || viewportHeight <= 0) {
+    return input.anchor;
+  }
+
+  const maxX = Math.max(POPOVER_MARGIN_PX, viewportWidth - input.width - POPOVER_MARGIN_PX);
+  const maxY = Math.max(POPOVER_MARGIN_PX, viewportHeight - input.height - POPOVER_MARGIN_PX);
+
+  return {
+    x: Math.min(Math.max(POPOVER_MARGIN_PX, input.anchor.x), maxX),
+    y: Math.min(Math.max(POPOVER_MARGIN_PX, input.anchor.y), maxY),
+  };
 }
 
 export function CalendarQuickCreatePopover({draft, categories, onCancel, onSubmit}: CalendarQuickCreatePopoverProps) {
@@ -28,6 +52,11 @@ export function CalendarQuickCreatePopover({draft, categories, onCancel, onSubmi
   const [categoryId, setCategoryId] = useState(() => categories[0]?.id ?? 0);
   const [error, setError] = useState(categories.length === 0 ? '请先创建分类' : '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [position, setPosition] = useState(() => clampPopoverPosition({
+    anchor: draft.anchor,
+    width: POPOVER_FALLBACK_WIDTH_PX,
+    height: POPOVER_FALLBACK_HEIGHT_PX,
+  }));
 
   useEffect(() => {
     mountedRef.current = true;
@@ -35,6 +64,14 @@ export function CalendarQuickCreatePopover({draft, categories, onCancel, onSubmi
       mountedRef.current = false;
     };
   }, []);
+
+  useLayoutEffect(() => {
+    setPosition(clampPopoverPosition({
+      anchor: draft.anchor,
+      width: POPOVER_FALLBACK_WIDTH_PX,
+      height: POPOVER_FALLBACK_HEIGHT_PX,
+    }));
+  }, [draft.anchor]);
 
   useEffect(() => {
     if (categories.length === 0) {
@@ -117,7 +154,7 @@ export function CalendarQuickCreatePopover({draft, categories, onCancel, onSubmi
       aria-label="快速创建任务"
       tabIndex={-1}
       className="z-50 w-72 rounded-lg border border-slate-200 bg-white p-4 text-xs shadow-lg"
-      style={{position: 'fixed', left: draft.anchor.x, top: draft.anchor.y}}
+      style={{position: 'fixed', left: position.x, top: position.y}}
     >
       <div className="mb-3 font-bold text-slate-700">{formatDraftRange(draft)}</div>
       <div className="grid gap-3">

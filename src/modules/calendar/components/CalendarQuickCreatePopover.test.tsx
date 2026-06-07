@@ -51,6 +51,8 @@ describe('CalendarQuickCreatePopover', () => {
   });
 
   it('positions the popover using fixed viewport coordinates', () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1024);
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(768);
     render(
       <CalendarQuickCreatePopover
         draft={timedDraft}
@@ -64,6 +66,25 @@ describe('CalendarQuickCreatePopover', () => {
       position: 'fixed',
       left: '30px',
       top: '40px',
+    });
+  });
+
+  it('keeps the fixed popover inside the viewport near the bottom right edge', () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(320);
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(240);
+    render(
+      <CalendarQuickCreatePopover
+        draft={{...timedDraft, anchor: {x: 310, y: 230}}}
+        categories={categories}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('dialog', {name: '快速创建任务'})).toHaveStyle({
+      position: 'fixed',
+      left: '20px',
+      top: '12px',
     });
   });
 

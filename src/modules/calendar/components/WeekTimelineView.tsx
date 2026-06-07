@@ -248,7 +248,7 @@ export function WeekTimelineView({
     };
   };
 
-  const handleAllDayPointerUp = (date: string) => {
+  const openAllDayQuickCreate = (date: string) => {
     const pointer = allDayQuickCreatePointerRef.current;
     if (!enableQuickCreate || !pointer) {
       clearQuickCreatePointers();
@@ -261,6 +261,24 @@ export function WeekTimelineView({
     });
     clearQuickCreatePointers();
     onOpenQuickCreate(draft);
+  };
+
+  const handleAllDayPointerUp = (date: string) => {
+    openAllDayQuickCreate(date);
+  };
+
+  const handleAllDaySegmentPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
+    const layerElement = event.currentTarget.parentElement;
+    if (!layerElement) {
+      clearQuickCreatePointers();
+      return;
+    }
+
+    openAllDayQuickCreate(getAllDayDropDate({
+      clientX: event.clientX,
+      days,
+      layerElement,
+    }));
   };
 
   const handleTimeSlotPointerDown = (event: ReactPointerEvent<HTMLElement>, date: string, hour: number) => {
@@ -413,6 +431,7 @@ export function WeekTimelineView({
                 draggable
                 aria-label={`${segment.startsOn} 至 ${segment.endsOn} ${task.title}`}
                 onDragStart={(event) => writeCalendarDragPayload(event.dataTransfer, {type: 'calendar-task', taskId: task.id, source: 'calendar'})}
+                onPointerUp={handleAllDaySegmentPointerUp}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => {
                   const layerElement = event.currentTarget.parentElement;
