@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 
 import type {Task} from '../../../../shared/domain/entities';
 import type {TaskPriority} from '../../../../shared/domain/status';
@@ -9,6 +9,11 @@ export interface TaskDetailsDraft {
   categoryId: number;
   tagIds: number[];
   priority: TaskPriority | null;
+}
+
+interface CreateScheduleDefaults {
+  plannedDate: string;
+  unscheduled: boolean;
 }
 
 interface UseTaskDraftControllerInput {
@@ -31,6 +36,7 @@ export function useTaskDraftController({defaultCategoryId}: UseTaskDraftControll
   const [priority, setPriority] = useState<TaskPriority | null>(null);
   const [plannedDate, setPlannedDate] = useState(() => toIsoDate(new Date()));
   const [unscheduled, setUnscheduled] = useState(true);
+  const [scheduleTouched, setScheduleTouched] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [details, setDetails] = useState<TaskDetailsDraft | null>(null);
 
@@ -54,12 +60,35 @@ export function useTaskDraftController({defaultCategoryId}: UseTaskDraftControll
     setDetails((current) => current ? {...current, ...patch} : current);
   }
 
-  function resetCreateDraft(nextCategoryId = defaultCategoryId) {
+  const resetCreateDraft = useCallback((nextCategoryId = defaultCategoryId, scheduleDefaults?: CreateScheduleDefaults) => {
     setTitle('');
     setCategoryId(nextCategoryId);
     setTagIds([]);
     setPriority(null);
-  }
+    if (scheduleDefaults) {
+      setPlannedDate(scheduleDefaults.plannedDate);
+      setUnscheduled(scheduleDefaults.unscheduled);
+    }
+    setScheduleTouched(false);
+  }, [defaultCategoryId]);
+
+  const setCreatePlannedDate = useCallback((value: string) => {
+    setScheduleTouched(true);
+    setPlannedDate(value);
+  }, []);
+
+  const setCreateUnscheduled = useCallback((value: boolean) => {
+    setScheduleTouched(true);
+    setUnscheduled(value);
+  }, []);
+
+  const applyScheduleDefaults = useCallback((defaults: CreateScheduleDefaults) => {
+    if (scheduleTouched) {
+      return;
+    }
+    setPlannedDate(defaults.plannedDate);
+    setUnscheduled(defaults.unscheduled);
+  }, [scheduleTouched]);
 
   return {
     createDraft: {
@@ -73,8 +102,9 @@ export function useTaskDraftController({defaultCategoryId}: UseTaskDraftControll
       setCategoryId,
       setTagIds,
       setPriority,
-      setPlannedDate,
-      setUnscheduled,
+      setPlannedDate: setCreatePlannedDate,
+      setUnscheduled: setCreateUnscheduled,
+      applyScheduleDefaults,
       reset: resetCreateDraft,
     },
     editDraft: {

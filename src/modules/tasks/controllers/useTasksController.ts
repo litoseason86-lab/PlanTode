@@ -2,13 +2,13 @@ import {useMemo} from 'react';
 
 import type {Task} from '../../../../shared/domain/entities';
 import type {TaskStatus} from '../../../../shared/domain/status';
-import {addIsoDateDays} from '../../../../shared/lib/date';
+import {addIsoDateDays, getWeekStart} from '../../../../shared/lib/date';
 
 export interface TaskFilterState {
   category: string;
   status: 'all' | TaskStatus;
-  dateScope: 'today' | 'seven-days' | 'all' | 'unscheduled';
-  selectedDate: string;
+  dateScope: 'today' | 'this-week' | 'all' | 'unscheduled';
+  today: string;
 }
 
 export function filterTasks(tasks: Task[], filters: TaskFilterState): Task[] {
@@ -22,19 +22,20 @@ export function filterTasks(tasks: Task[], filters: TaskFilterState): Task[] {
     }
 
     if (filters.dateScope === 'today') {
-      return task.plannedDate === filters.selectedDate;
+      return task.plannedDate === filters.today;
     }
 
     if (filters.dateScope === 'unscheduled') {
       return !task.plannedDate;
     }
 
-    if (filters.dateScope === 'seven-days') {
+    if (filters.dateScope === 'this-week') {
       if (!task.plannedDate) {
         return false;
       }
-      const limit = addIsoDateDays(filters.selectedDate, 7);
-      return task.plannedDate >= filters.selectedDate && task.plannedDate <= limit;
+      const weekStart = getWeekStart(filters.today);
+      const weekEnd = addIsoDateDays(weekStart, 6);
+      return task.plannedDate >= weekStart && task.plannedDate <= weekEnd;
     }
 
     return true;

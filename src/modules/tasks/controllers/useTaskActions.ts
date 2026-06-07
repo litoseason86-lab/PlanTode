@@ -53,16 +53,17 @@ export function useTaskActions({
   const [taskFormUnscheduled, setTaskFormUnscheduled] = useState(activeTab === 'tasks');
   const [taskFilterCategory, setTaskFilterCategory] = useState('all');
   const [taskFilterStatus, setTaskFilterStatus] = useState('all');
-  const [taskFilterDateScope, setTaskFilterDateScope] = useState<'today' | 'seven-days' | 'all' | 'unscheduled'>('today');
+  const [taskFilterDateScope, setTaskFilterDateScope] = useState<'today' | 'this-week' | 'all' | 'unscheduled'>('today');
+  const taskLibraryToday = toIsoDate(new Date());
 
   const filteredTaskItems = useMemo(
     () => filterTasks(allTasks, {
       category: taskFilterCategory,
       status: taskFilterStatus as 'all' | TaskStatus,
       dateScope: taskFilterDateScope,
-      selectedDate,
+      today: taskLibraryToday,
     }),
-    [allTasks, taskFilterCategory, taskFilterStatus, taskFilterDateScope, selectedDate],
+    [allTasks, taskFilterCategory, taskFilterStatus, taskFilterDateScope, taskLibraryToday],
   );
 
   function setDefaultTaskCategory(categoryId: number) {

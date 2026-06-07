@@ -6,7 +6,7 @@ import type {TaskStatus} from '../../../../shared/domain/status';
 import {TaskFilterBar} from './TaskFilterBar';
 import {TaskListItem} from './TaskListItem';
 
-type TaskFilterDateScope = 'today' | 'seven-days' | 'all' | 'unscheduled';
+type TaskFilterDateScope = 'today' | 'this-week' | 'all' | 'unscheduled';
 type TaskPriorityFilter = 'all' | 'none' | TaskPriority;
 
 interface TaskListProps {
@@ -17,9 +17,7 @@ interface TaskListProps {
   };
   categories: Category[];
   tags: Tag[];
-  allTasks: Task[];
   filteredTaskItems: Task[];
-  calendarVisible: boolean;
   filters: {
     category: string;
     status: 'all' | TaskStatus;
@@ -34,7 +32,6 @@ interface TaskListProps {
     setPriority: (value: TaskPriorityFilter) => void;
     setQuery: (value: string) => void;
   };
-  onToggleCalendar: () => void;
   handleUpdateTaskStatus: (id: number, status: TaskStatus) => void;
   handleStartSession: (task: Task) => void;
   handleDeleteTask: (taskId: number) => void;
@@ -45,11 +42,8 @@ export function TaskList({
   styleContext,
   categories,
   tags,
-  allTasks,
   filteredTaskItems,
-  calendarVisible,
   filters,
-  onToggleCalendar,
   handleUpdateTaskStatus,
   handleStartSession,
   handleDeleteTask,
@@ -61,7 +55,6 @@ export function TaskList({
         categories={categories}
         tags={tags}
         filteredCount={filteredTaskItems.length}
-        calendarVisible={calendarVisible}
         taskFilterCategory={filters.category}
         taskFilterStatus={filters.status}
         taskFilterDateScope={filters.dateScope}
@@ -74,7 +67,6 @@ export function TaskList({
         onTagIdsChange={filters.setTagIds}
         onPriorityChange={filters.setPriority}
         onQueryChange={filters.setQuery}
-        onToggleCalendar={onToggleCalendar}
       />
 
       <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
@@ -92,7 +84,7 @@ export function TaskList({
             />
           ))}
 
-          {allTasks.length === 0 && (
+          {filteredTaskItems.length === 0 && (
             <div className="p-12 text-center text-slate-400">
               <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4" style={{backgroundColor: styleContext.primaryLight}}>
                 <ListTodo className="w-8 h-8 stroke-[1.5]" style={{color: styleContext.primary}} />

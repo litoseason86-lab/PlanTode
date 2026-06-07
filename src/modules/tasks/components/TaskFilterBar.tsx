@@ -2,14 +2,13 @@ import type {Category, Tag} from '../../../../shared/domain/entities';
 import type {TaskPriority, TaskStatus} from '../../../../shared/domain/status';
 import {TASK_PRIORITIES} from '../../../../shared/domain/status';
 
-type TaskFilterDateScope = 'today' | 'seven-days' | 'all' | 'unscheduled';
+type TaskFilterDateScope = 'today' | 'this-week' | 'all' | 'unscheduled';
 type TaskPriorityFilter = 'all' | 'none' | TaskPriority;
 
 interface TaskFilterBarProps {
   categories: Category[];
   tags: Tag[];
   filteredCount: number;
-  calendarVisible: boolean;
   taskFilterCategory: string;
   taskFilterStatus: string;
   taskFilterDateScope: TaskFilterDateScope;
@@ -22,14 +21,12 @@ interface TaskFilterBarProps {
   onTagIdsChange: (value: number[]) => void;
   onPriorityChange: (value: TaskPriorityFilter) => void;
   onQueryChange: (value: string) => void;
-  onToggleCalendar: () => void;
 }
 
 export function TaskFilterBar({
   categories,
   tags,
   filteredCount,
-  calendarVisible,
   taskFilterCategory,
   taskFilterStatus,
   taskFilterDateScope,
@@ -42,7 +39,6 @@ export function TaskFilterBar({
   onTagIdsChange,
   onPriorityChange,
   onQueryChange,
-  onToggleCalendar,
 }: TaskFilterBarProps) {
   const toggleTag = (tagId: number) => {
     if (selectedTagIds.includes(tagId)) {
@@ -97,16 +93,25 @@ export function TaskFilterBar({
 
         <div className="space-y-0.5">
           <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest pl-1">日期</p>
-          <select
-            value={taskFilterDateScope}
-            onChange={(event) => setTaskFilterDateScope(event.target.value as TaskFilterDateScope)}
-            className="px-2.5 py-1.5 text-xs border border-slate-200 bg-white rounded-lg text-slate-700 font-semibold outline-none transition-colors hover:border-slate-300"
-          >
-            <option value="today">今日</option>
-            <option value="seven-days">未来7天</option>
-            <option value="unscheduled">未安排</option>
-            <option value="all">全部</option>
-          </select>
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+            {[
+              {value: 'today', label: '今日'},
+              {value: 'this-week', label: '本周'},
+              {value: 'unscheduled', label: '未安排'},
+              {value: 'all', label: '全部'},
+            ].map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setTaskFilterDateScope(item.value as TaskFilterDateScope)}
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors ${
+                  taskFilterDateScope === item.value ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-0.5">
@@ -152,13 +157,6 @@ export function TaskFilterBar({
         <span className="text-[10px] font-semibold text-slate-400 font-mono bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/60">
           匹配: {filteredCount} 项
         </span>
-        <button
-          type="button"
-          onClick={onToggleCalendar}
-          className="px-2.5 py-1.5 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-        >
-          {calendarVisible ? '隐藏日历' : '显示日历'}
-        </button>
       </div>
     </div>
   );

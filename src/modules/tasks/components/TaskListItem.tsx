@@ -1,9 +1,7 @@
-import {Calendar, Edit3, GripVertical, Trash2} from 'lucide-react';
+import {Calendar, Edit3, Trash2} from 'lucide-react';
 
 import type {Category, Task} from '../../../../shared/domain/entities';
 import type {TaskStatus} from '../../../../shared/domain/status';
-import {writeCalendarDragPayload} from '../../calendar/controllers/schedulingDrag';
-import {timedTaskDurationMinutes} from '../../calendar/controllers/weekTimelineLayout';
 
 interface TaskListItemProps {
   styleContext: {
@@ -17,19 +15,6 @@ interface TaskListItemProps {
   handleStartSession: (task: Task) => void;
   handleDeleteTask: (taskId: number) => void;
   onEditTask: (task: Task) => void;
-}
-
-function writeTaskListDragPayload(dataTransfer: DataTransfer, task: Task): void {
-  if (!task.allDay && task.startAt && task.endAt) {
-    writeCalendarDragPayload(dataTransfer, {
-      type: 'calendar-timed-task',
-      taskId: task.id,
-      durationMinutes: timedTaskDurationMinutes({startAt: task.startAt, endAt: task.endAt}),
-    });
-    return;
-  }
-
-  writeCalendarDragPayload(dataTransfer, {type: 'calendar-task', taskId: task.id, source: 'task-list'});
 }
 
 export function TaskListItem({
@@ -68,17 +53,6 @@ export function TaskListItem({
       </div>
 
       <div className="flex items-center gap-2 shrink-0 select-none">
-        <button
-          type="button"
-          aria-label={`拖拽任务 ${task.title}`}
-          draggable
-          onDragStart={(event) => {
-            writeTaskListDragPayload(event.dataTransfer, task);
-          }}
-          className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
-        >
-          <GripVertical className="w-3.5 h-3.5" />
-        </button>
         <select
           aria-label={`task-status-${task.id}`}
           value={task.status}

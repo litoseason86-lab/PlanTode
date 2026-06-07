@@ -4,12 +4,7 @@ import type {FormEvent} from 'react';
 
 import type {Category, Tag, Task} from '../../../../shared/domain/entities';
 import type {TaskPriority, TaskStatus} from '../../../../shared/domain/status';
-import {readCalendarDragPayload} from '../../calendar/controllers/schedulingDrag';
 import {TasksPanel} from './TasksPanel';
-
-vi.mock('../../calendar/components/EmbeddedCalendarPanel', () => ({
-  EmbeddedCalendarPanel: () => <div data-testid="embedded-calendar" />,
-}));
 
 const baseCategories: Category[] = [
   {
@@ -57,6 +52,7 @@ function baseController() {
       setPriority: vi.fn(),
       setPlannedDate: vi.fn(),
       setUnscheduled: vi.fn(),
+      applyScheduleDefaults: vi.fn(),
       reset: vi.fn(),
     },
     editDraft: {
@@ -71,7 +67,7 @@ function baseController() {
     filters: {
       category: 'all',
       status: 'all' as 'all' | TaskStatus,
-      dateScope: 'today' as 'today' | 'seven-days' | 'all' | 'unscheduled',
+      dateScope: 'today' as 'today' | 'this-week' | 'all' | 'unscheduled',
       tagIds: [] as number[],
       priority: 'all' as const,
       query: '',
@@ -99,11 +95,6 @@ function baseController() {
       updateTaskStatus: vi.fn(),
       startSession: vi.fn(),
     },
-    calendar: {
-      selectedDate: '2026-06-05',
-      showToast: vi.fn(),
-      onMutationSuccess: vi.fn(),
-    },
     openEditTask: vi.fn(),
     closeEditTask: vi.fn(),
   };
@@ -116,16 +107,9 @@ function renderPanel(controller: TestController = baseController()) {
     <TasksPanel
       styleContext={{primary: '#fb7185', primaryLight: '#fff1f2', secondary: '#fda4af'}}
       controller={controller}
+      onOpenCalendar={vi.fn()}
     />,
   );
-}
-
-function createDragData() {
-  const values = new Map<string, string>();
-  return {
-    setData: (type: string, value: string) => values.set(type, value),
-    getData: (type: string) => values.get(type) ?? '',
-  } as unknown as DataTransfer;
 }
 
 describe('TasksPanel', () => {
@@ -182,13 +166,22 @@ describe('TasksPanel', () => {
     expect(screen.getAllByText('未安排').length).toBeGreaterThan(0);
   });
 
+  it('shows an empty state when filters match no tasks', () => {
+    const controller = baseController();
+    controller.filteredTaskItems = [];
+
+    renderPanel(controller);
+
+    expect(screen.getByText('没有找到符合这些筛选的储备方案项')).toBeInTheDocument();
+  });
+
   it('shows an unscheduled filter option', () => {
     const controller = baseController();
     controller.filters.dateScope = 'unscheduled';
 
     renderPanel(controller);
 
-    expect(screen.getByRole('option', {name: '未安排'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: '未安排'})).toBeInTheDocument();
   });
 
   it('renders an explicit unscheduled create option', () => {
@@ -196,36 +189,36 @@ describe('TasksPanel', () => {
     expect(screen.getByLabelText('不安排日期')).toBeInTheDocument();
   });
 
-  it('toggles the embedded calendar', () => {
+  it('does not render the embedded calendar toggle or task drag handle', () => {
     renderPanel();
-    fireEvent.click(screen.getByRole('button', {name: '显示日历'}));
-    expect(screen.getByRole('button', {name: '隐藏日历'})).toBeInTheDocument();
+
+    expect(screen.queryByRole('button', {name: '显示日历'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '隐藏日历'})).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('拖拽任务 写周报')).not.toBeInTheDocument();
   });
 
-  it('writes task-list drag payload from the drag handle only', () => {
-    const data = createDragData();
-    renderPanel();
-    fireEvent.dragStart(screen.getByLabelText('拖拽任务 写周报'), {dataTransfer: data});
-    expect(readCalendarDragPayload(data)).toEqual({type: 'calendar-task', taskId: 1, source: 'task-list'});
+  it('opens the full calendar through the navigation callback', () => {
+    const onOpenCalendar = vi.fn();
+
+    render(
+      <TasksPanel
+        styleContext={{primary: '#fb7185', primaryLight: '#fff1f2', secondary: '#fda4af'}}
+        controller={baseController()}
+        onOpenCalendar={onOpenCalendar}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', {name: '去日历安排'}));
+
+    expect(onOpenCalendar).toHaveBeenCalledOnce();
   });
 
-  it('writes timed task drag payload with duration from the drag handle', () => {
-    const data = createDragData();
+  it('switches task date scope through explicit buttons', () => {
     const controller = baseController();
-    controller.filteredTaskItems = [{
-      ...baseTasks[0],
-      allDay: false,
-      startAt: '2026-06-05T09:15:00.000',
-      endAt: '2026-06-05T10:45:00.000',
-    }];
-
     renderPanel(controller);
-    fireEvent.dragStart(screen.getByLabelText('拖拽任务 写周报'), {dataTransfer: data});
 
-    expect(readCalendarDragPayload(data)).toEqual({
-      type: 'calendar-timed-task',
-      taskId: 1,
-      durationMinutes: 90,
-    });
+    fireEvent.click(screen.getByRole('button', {name: '本周'}));
+
+    expect(controller.filters.setDateScope).toHaveBeenCalledWith('this-week');
   });
 });

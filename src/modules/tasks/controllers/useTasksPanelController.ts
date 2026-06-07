@@ -1,18 +1,19 @@
-import {useCallback} from 'react';
+import {useCallback, useEffect, useMemo} from 'react';
 
 import type {Category, Tag, Task} from '../../../../shared/domain/entities';
 import type {TaskStatus} from '../../../../shared/domain/status';
+import {toIsoDate} from '../../../../shared/lib/date';
 import {getErrorMessage} from '../../../app/errors';
 import {useTagActions} from '../../tags/controllers/useTagActions';
 import {useTaskDraftController} from './useTaskDraftController';
-import {useTaskFilterController} from './useTaskFilterController';
+import {type TaskFilterDateScope, useTaskFilterController} from './useTaskFilterController';
 import {useTaskMutations} from './useTaskMutations';
 
 interface UseTasksPanelControllerInput {
   categories: Category[];
   tags: Tag[];
   allTasks: Task[];
-  selectedDate: string;
+  today?: string;
   setLoading: (loading: boolean) => void;
   showToast: (message: string, type?: 'success' | 'error') => void;
   refreshTags: () => Promise<Tag[]>;
@@ -24,11 +25,18 @@ interface UseTasksPanelControllerInput {
   startSession: (task: Task) => void;
 }
 
+function buildCreateScheduleDefaults(dateScope: TaskFilterDateScope, today: string) {
+  return {
+    plannedDate: today,
+    unscheduled: dateScope === 'unscheduled',
+  };
+}
+
 export function useTasksPanelController({
   categories,
   tags,
   allTasks,
-  selectedDate,
+  today,
   setLoading,
   showToast,
   refreshTags,
@@ -40,8 +48,14 @@ export function useTasksPanelController({
   startSession,
 }: UseTasksPanelControllerInput) {
   const defaultCategoryId = categories[0]?.id ?? 0;
+  const taskLibraryToday = today ?? toIsoDate(new Date());
   const draftController = useTaskDraftController({defaultCategoryId});
-  const filterController = useTaskFilterController(allTasks, selectedDate);
+  const applyScheduleDefaults = draftController.createDraft.applyScheduleDefaults;
+  const filterController = useTaskFilterController(allTasks, taskLibraryToday);
+  const createScheduleDefaults = useMemo(
+    () => buildCreateScheduleDefaults(filterController.filters.dateScope, taskLibraryToday),
+    [filterController.filters.dateScope, taskLibraryToday],
+  );
   const tagActions = useTagActions({refreshTags, refreshAllTasks});
   const taskMutations = useTaskMutations({
     refreshAllTasks,
@@ -49,6 +63,10 @@ export function useTasksPanelController({
     stopRunningSessionForTask,
     refreshReports,
   });
+
+  useEffect(() => {
+    applyScheduleDefaults(createScheduleDefaults);
+  }, [applyScheduleDefaults, createScheduleDefaults]);
 
   const createTask = useCallback(async (event?: React.FormEvent) => {
     event?.preventDefault();
@@ -75,14 +93,14 @@ export function useTasksPanelController({
           ? undefined
           : draftController.createDraft.plannedDate,
       });
-      draftController.createDraft.reset(categoryId);
+      draftController.createDraft.reset(categoryId, createScheduleDefaults);
       showToast('任务已成功下派！');
     } catch (err) {
       showToast(getErrorMessage(err, '生成行动项失败'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [defaultCategoryId, draftController.createDraft, setLoading, showToast, taskMutations]);
+  }, [createScheduleDefaults, defaultCategoryId, draftController.createDraft, setLoading, showToast, taskMutations]);
 
   const updateTaskDetails = useCallback(async (details: {
     title: string;
@@ -145,14 +163,6 @@ export function useTasksPanelController({
     statusActions: {
       updateTaskStatus,
       startSession,
-    },
-    calendar: {
-      selectedDate,
-      showToast,
-      onMutationSuccess: async () => {
-        await refreshAllTasks();
-        await loadTasksForSelectedDate();
-      },
     },
     openEditTask: draftController.openEditTask,
     closeEditTask: draftController.closeEditTask,

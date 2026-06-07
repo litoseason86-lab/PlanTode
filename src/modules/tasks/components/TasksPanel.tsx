@@ -1,6 +1,3 @@
-import {useState} from 'react';
-
-import {EmbeddedCalendarPanel} from '../../calendar/components/EmbeddedCalendarPanel';
 import type {TasksPanelController} from '../controllers/useTasksPanelController';
 import {TaskBasicInfoModal} from './TaskBasicInfoModal';
 import {TaskCreateForm} from './TaskCreateForm';
@@ -13,21 +10,17 @@ interface TasksPanelProps {
     secondary: string;
   };
   controller: TasksPanelController;
+  onOpenCalendar: () => void;
 }
 
-export function TasksPanel({styleContext, controller}: TasksPanelProps) {
-  const [calendarVisible, setCalendarVisible] = useState(false);
-
+export function TasksPanel({styleContext, controller, onOpenCalendar}: TasksPanelProps) {
   const taskList = (
     <TaskList
       styleContext={styleContext}
       categories={controller.categories}
       tags={controller.tags}
-      allTasks={controller.allTasks}
       filteredTaskItems={controller.filteredTaskItems}
-      calendarVisible={calendarVisible}
       filters={controller.filters}
-      onToggleCalendar={() => setCalendarVisible((visible) => !visible)}
       handleUpdateTaskStatus={controller.statusActions.updateTaskStatus}
       handleStartSession={controller.statusActions.startSession}
       handleDeleteTask={controller.mutations.deleteTask}
@@ -43,6 +36,13 @@ export function TasksPanel({styleContext, controller}: TasksPanelProps) {
         </span>
         <h2 className="text-xl font-extrabold text-slate-800 mt-1">全局储备与规划中心</h2>
         <p className="text-xs text-slate-500 font-medium">配置、调度未来日期及历届滞存指令集的核心仓库，支持多级交叉状态过滤。</p>
+        <button
+          type="button"
+          onClick={onOpenCalendar}
+          className="mt-3 w-fit px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+        >
+          去日历安排
+        </button>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -66,17 +66,7 @@ export function TasksPanel({styleContext, controller}: TasksPanelProps) {
           handleCreateTask={controller.mutations.createTask}
         />
 
-        {calendarVisible ? (
-          <div className="lg:col-span-2 grid grid-cols-1 xl:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)] gap-4">
-            {taskList}
-            <EmbeddedCalendarPanel
-              categories={controller.categories}
-              initialDate={controller.calendar.selectedDate}
-              showToast={controller.calendar.showToast}
-              onMutationSuccess={controller.calendar.onMutationSuccess}
-            />
-          </div>
-        ) : taskList}
+        {taskList}
       </div>
 
       {controller.editDraft.task && (

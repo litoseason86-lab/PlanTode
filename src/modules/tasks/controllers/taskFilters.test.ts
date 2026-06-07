@@ -19,7 +19,7 @@ const baseTask = {
 const baseFilters = {
   category: 'all',
   status: 'all' as const,
-  selectedDate: '2026-06-06',
+  today: '2026-06-06',
 };
 
 describe('filterTasks', () => {
@@ -57,7 +57,7 @@ describe('filterTasks', () => {
       category: '2',
       status: 'DONE',
       dateScope: 'all',
-      selectedDate: '2026-06-05',
+      today: '2026-06-05',
     });
 
     expect(result.map((task) => task.id)).toEqual([2]);
@@ -83,21 +83,21 @@ describe('filterTasks', () => {
       category: 'all',
       status: 'all',
       dateScope: 'today',
-      selectedDate: '2026-06-05',
+      today: '2026-06-05',
     }).map((task) => task.title)).not.toContain('未安排');
 
     expect(filterTasks([unscheduled, scheduled], {
       category: 'all',
       status: 'all',
-      dateScope: 'seven-days',
-      selectedDate: '2026-06-05',
+      dateScope: 'this-week',
+      today: '2026-06-05',
     }).map((task) => task.title)).not.toContain('未安排');
 
     expect(filterTasks([unscheduled, scheduled], {
       category: 'all',
       status: 'all',
       dateScope: 'all',
-      selectedDate: '2026-06-05',
+      today: '2026-06-05',
     }).map((task) => task.title)).toContain('未安排');
   });
 
@@ -109,8 +109,21 @@ describe('filterTasks', () => {
       category: 'all',
       status: 'all',
       dateScope: 'unscheduled',
-      selectedDate: '2026-06-06',
+      today: '2026-06-06',
     }).map((task) => task.title)).toEqual(['未安排']);
+  });
+
+  it('filters this-week by natural week boundaries', () => {
+    expect(filterTasks([
+      {...baseTask, id: 1, plannedDate: '2026-06-01', title: '周一'},
+      {...baseTask, id: 2, plannedDate: '2026-06-07', title: '周日'},
+      {...baseTask, id: 3, plannedDate: '2026-06-08', title: '下周一'},
+    ], {
+      category: 'all',
+      status: 'all',
+      dateScope: 'this-week',
+      today: '2026-06-03',
+    }).map((task) => task.title)).toEqual(['周一', '周日']);
   });
 
   it('keeps unscheduled tasks in all scope but excludes them from date scopes', () => {

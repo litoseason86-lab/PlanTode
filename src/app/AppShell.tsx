@@ -102,7 +102,6 @@ export default function AppShell() {
     categories,
     tags,
     allTasks,
-    selectedDate,
     setLoading,
     showToast,
     refreshTags,
@@ -231,6 +230,7 @@ export default function AppShell() {
           <TasksPanel
             styleContext={{primary: styleContext.primary, primaryLight: styleContext.primaryLight, secondary: styleContext.secondary}}
             controller={tasksPanelController}
+            onOpenCalendar={() => setActiveTab('calendar')}
           />
         )}
         {activeTab === 'categories' && (

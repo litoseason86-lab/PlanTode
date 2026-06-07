@@ -40,7 +40,7 @@ describe('filterTasksWithMetadata', () => {
       category: 'all',
       status: 'all',
       dateScope: 'all',
-      selectedDate: '2026-06-07',
+      today: '2026-06-07',
       tagIds: [1, 2],
       priority: 'none',
       query: '',
@@ -55,7 +55,7 @@ describe('filterTasksWithMetadata', () => {
       category: 'all',
       status: 'all',
       dateScope: 'all',
-      selectedDate: '2026-06-07',
+      today: '2026-06-07',
       tagIds: [],
       priority: 'all',
       query: '客户',
@@ -68,10 +68,66 @@ describe('filterTasksWithMetadata', () => {
       category: 'all',
       status: 'all',
       dateScope: 'all',
-      selectedDate: '2026-06-07',
+      today: '2026-06-07',
       tagIds: [],
       priority: 'none',
       query: '',
     })).toEqual([{...taskA, title: '无优先级', tagIds: [], priority: null}]);
+  });
+
+  it('filters today and this-week from a runtime today anchor', () => {
+    const tasks = [
+      {...taskA, id: 10, title: '周一', plannedDate: '2026-06-01'},
+      {...taskA, id: 11, title: '周日', plannedDate: '2026-06-07'},
+      {...taskA, id: 12, title: '下周一', plannedDate: '2026-06-08'},
+      {...taskA, id: 13, title: '未安排', plannedDate: undefined},
+    ];
+
+    expect(filterTasksWithMetadata(tasks, {
+      category: 'all',
+      status: 'all',
+      dateScope: 'today',
+      today: '2026-06-03',
+      tagIds: [],
+      priority: 'all',
+      query: '',
+    }).map((task) => task.title)).toEqual([]);
+
+    expect(filterTasksWithMetadata(tasks, {
+      category: 'all',
+      status: 'all',
+      dateScope: 'this-week',
+      today: '2026-06-03',
+      tagIds: [],
+      priority: 'all',
+      query: '',
+    }).map((task) => task.title)).toEqual(['周一', '周日']);
+  });
+
+  it('keeps unscheduled tasks out of date scopes and inside unscheduled scope', () => {
+    const tasks = [
+      {...taskA, id: 20, title: '今日任务', plannedDate: '2026-06-03'},
+      {...taskA, id: 21, title: '未安排任务', plannedDate: undefined},
+    ];
+
+    expect(filterTasksWithMetadata(tasks, {
+      category: 'all',
+      status: 'all',
+      dateScope: 'this-week',
+      today: '2026-06-03',
+      tagIds: [],
+      priority: 'all',
+      query: '',
+    }).map((task) => task.title)).toEqual(['今日任务']);
+
+    expect(filterTasksWithMetadata(tasks, {
+      category: 'all',
+      status: 'all',
+      dateScope: 'unscheduled',
+      today: '2026-06-03',
+      tagIds: [],
+      priority: 'all',
+      query: '',
+    }).map((task) => task.title)).toEqual(['未安排任务']);
   });
 });

@@ -2,19 +2,28 @@ import {useMemo, useState} from 'react';
 
 import type {Task} from '../../../../shared/domain/entities';
 import type {TaskPriority, TaskStatus} from '../../../../shared/domain/status';
-import {addIsoDateDays} from '../../../../shared/lib/date';
+import {addIsoDateDays, getWeekStart, toIsoDate} from '../../../../shared/lib/date';
 
-export type TaskFilterDateScope = 'today' | 'seven-days' | 'all' | 'unscheduled';
+export type TaskFilterDateScope = 'today' | 'this-week' | 'all' | 'unscheduled';
 export type TaskPriorityFilter = 'all' | 'none' | TaskPriority;
 
 export interface TaskMetadataFilterState {
   category: string;
   status: 'all' | TaskStatus;
   dateScope: TaskFilterDateScope;
-  selectedDate: string;
+  today: string;
   tagIds: number[];
   priority: TaskPriorityFilter;
   query: string;
+}
+
+function isInCurrentWeek(plannedDate: string | undefined, today: string): boolean {
+  if (!plannedDate) {
+    return false;
+  }
+  const weekStart = getWeekStart(today);
+  const weekEnd = addIsoDateDays(weekStart, 6);
+  return plannedDate >= weekStart && plannedDate <= weekEnd;
 }
 
 export function filterTasksWithMetadata(tasks: Task[], filters: TaskMetadataFilterState): Task[] {
@@ -29,7 +38,7 @@ export function filterTasksWithMetadata(tasks: Task[], filters: TaskMetadataFilt
       return false;
     }
 
-    if (filters.dateScope === 'today' && task.plannedDate !== filters.selectedDate) {
+    if (filters.dateScope === 'today' && task.plannedDate !== filters.today) {
       return false;
     }
 
@@ -37,14 +46,8 @@ export function filterTasksWithMetadata(tasks: Task[], filters: TaskMetadataFilt
       return false;
     }
 
-    if (filters.dateScope === 'seven-days') {
-      if (!task.plannedDate) {
-        return false;
-      }
-      const limit = addIsoDateDays(filters.selectedDate, 7);
-      if (task.plannedDate < filters.selectedDate || task.plannedDate > limit) {
-        return false;
-      }
+    if (filters.dateScope === 'this-week' && !isInCurrentWeek(task.plannedDate, filters.today)) {
+      return false;
     }
 
     if (!filters.tagIds.every((tagId) => task.tagIds.includes(tagId))) {
@@ -63,7 +66,7 @@ export function filterTasksWithMetadata(tasks: Task[], filters: TaskMetadataFilt
   });
 }
 
-export function useTaskFilterController(tasks: Task[], selectedDate: string) {
+export function useTaskFilterController(tasks: Task[], today = toIsoDate(new Date())) {
   const [category, setCategory] = useState('all');
   const [status, setStatus] = useState<'all' | TaskStatus>('all');
   const [dateScope, setDateScope] = useState<TaskFilterDateScope>('today');
@@ -76,12 +79,12 @@ export function useTaskFilterController(tasks: Task[], selectedDate: string) {
       category,
       status,
       dateScope,
-      selectedDate,
+      today,
       tagIds,
       priority,
       query,
     }),
-    [category, dateScope, priority, query, selectedDate, status, tagIds, tasks],
+    [category, dateScope, priority, query, status, tagIds, tasks, today],
   );
 
   return {
