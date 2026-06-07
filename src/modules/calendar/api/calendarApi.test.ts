@@ -7,7 +7,9 @@ vi.mock('../../tasks/api/tasksApi', () => ({
   tasksApi: {
     getTasks: vi.fn(),
     createTask: vi.fn(),
+    updateTaskDetails: vi.fn(),
     updateTaskSchedule: vi.fn(),
+    deleteTask: vi.fn(),
     batchScheduleDate: vi.fn(),
     batchUnschedule: vi.fn(),
   },
@@ -99,5 +101,31 @@ describe('calendarApi', () => {
       priority: null,
       tagIds: [],
     });
+  });
+
+  it('forwards task detail updates to tasks API without dropping metadata', async () => {
+    vi.mocked(tasksApi.updateTaskDetails).mockResolvedValue({id: 1} as never);
+
+    await calendarApi.updateTaskDetails(1, {
+      title: '数学',
+      categoryId: 2,
+      priority: 'P1',
+      tagIds: [3, 4],
+    });
+
+    expect(tasksApi.updateTaskDetails).toHaveBeenCalledWith(1, {
+      title: '数学',
+      categoryId: 2,
+      priority: 'P1',
+      tagIds: [3, 4],
+    });
+  });
+
+  it('forwards task deletion to tasks API', async () => {
+    vi.mocked(tasksApi.deleteTask).mockResolvedValue(undefined);
+
+    await calendarApi.deleteTask(9);
+
+    expect(tasksApi.deleteTask).toHaveBeenCalledWith(9);
   });
 });

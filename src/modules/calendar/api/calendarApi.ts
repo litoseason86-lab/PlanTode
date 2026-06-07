@@ -64,6 +64,22 @@ export const calendarApi = {
     return tasksApi.updateTaskSchedule(taskId, schedule);
   },
 
+  updateTaskDetails(
+    taskId: number,
+    details: {
+      title: string;
+      categoryId: number;
+      priority: TaskPriority | null;
+      tagIds: number[];
+    },
+  ): Promise<Task> {
+    return tasksApi.updateTaskDetails(taskId, details);
+  },
+
+  deleteTask(taskId: number): Promise<void> {
+    return tasksApi.deleteTask(taskId);
+  },
+
   batchScheduleDate(input: {taskIds: number[]; plannedDate: string}): Promise<Task[]> {
     return tasksApi.batchScheduleDate(input);
   },
