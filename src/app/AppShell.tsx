@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
 
 import {CalendarPanel} from '../modules/calendar/components/CalendarPanel';
-import {CategoryPanel} from '../modules/categories/components/CategoryPanel';
+import {OrganizationPanel} from '../modules/categories/components/OrganizationPanel';
 import {useCategoryActions} from '../modules/categories/controllers/useCategoryActions';
 import {DashboardPanel} from '../modules/dashboard/components/DashboardPanel';
 import {useDashboardController} from '../modules/dashboard/controllers/useDashboardController';
@@ -15,6 +15,7 @@ import {THEME_STYLES, type ThemeId} from './theme';
 import {useTaskActions} from '../modules/tasks/controllers/useTaskActions';
 import {useTasksPanelController} from '../modules/tasks/controllers/useTasksPanelController';
 import {TasksPanel} from '../modules/tasks/components/TasksPanel';
+import {useTagActions} from '../modules/tags/controllers/useTagActions';
 import {AppHeader} from './components/AppHeader';
 import {AppToast} from './components/AppToast';
 import {GlobalRunningBar} from './components/GlobalRunningBar';
@@ -67,6 +68,10 @@ export default function AppShell() {
     refreshCategories,
     setLoading,
     showToast,
+  });
+  const tagActions = useTagActions({
+    refreshTags,
+    refreshAllTasks,
   });
   const taskActions = useTaskActions({
     categories,
@@ -224,23 +229,16 @@ export default function AppShell() {
           />
         )}
         {activeTab === 'categories' && (
-          <CategoryPanel
+          <OrganizationPanel
             styleContext={{primary: styleContext.primary, primaryLight: styleContext.primaryLight}}
             categories={categories}
-            allTasks={allTasks}
-            presetColors={PRESET_COLORS}
-            isCategoryModalOpen={categoryActions.isCategoryModalOpen}
-            editingCategory={categoryActions.editingCategory}
-            catFormName={categoryActions.catFormName}
-            catFormColor={categoryActions.catFormColor}
-            catFormSort={categoryActions.catFormSort}
-            setIsCategoryModalOpen={categoryActions.setIsCategoryModalOpen}
-            setCatFormName={categoryActions.setCatFormName}
-            setCatFormColor={categoryActions.setCatFormColor}
-            setCatFormSort={categoryActions.setCatFormSort}
-            handleOpenCategoryModal={categoryActions.handleOpenCategoryModal}
-            handleDeleteCategory={categoryActions.handleDeleteCategory}
-            handleSaveCategory={categoryActions.handleSaveCategory}
+            tags={tags}
+            categoryController={{
+              allTasks,
+              presetColors: PRESET_COLORS,
+              ...categoryActions,
+            }}
+            tagController={tagActions}
           />
         )}
         {activeTab === 'calendar' && (

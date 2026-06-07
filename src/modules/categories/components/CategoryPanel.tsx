@@ -2,11 +2,12 @@ import {Check, Edit3, Plus, Trash2, X} from 'lucide-react';
 
 import type {Category, Task} from '../../../../shared/domain/entities';
 
-interface CategoryPanelProps {
-  styleContext: {
-    primary: string;
-    primaryLight: string;
-  };
+interface CategoryStyleContext {
+  primary: string;
+  primaryLight: string;
+}
+
+export interface CategoryController {
   categories: Category[];
   allTasks: Task[];
   presetColors: Array<{hex: string; label: string}>;
@@ -24,24 +25,37 @@ interface CategoryPanelProps {
   handleSaveCategory: () => void;
 }
 
-export function CategoryPanel({
+interface CategorySectionProps {
+  styleContext: CategoryStyleContext;
+  controller: CategoryController;
+}
+
+interface CategoryPanelProps extends CategoryController {
+  styleContext: CategoryStyleContext;
+}
+
+export function CategorySection({
   styleContext,
-  categories,
-  allTasks,
-  presetColors,
-  isCategoryModalOpen,
-  editingCategory,
-  catFormName,
-  catFormColor,
-  catFormSort,
-  setIsCategoryModalOpen,
-  setCatFormName,
-  setCatFormColor,
-  setCatFormSort,
-  handleOpenCategoryModal,
-  handleDeleteCategory,
-  handleSaveCategory,
-}: CategoryPanelProps) {
+  controller,
+}: CategorySectionProps) {
+  const {
+    categories,
+    allTasks,
+    presetColors,
+    isCategoryModalOpen,
+    editingCategory,
+    catFormName,
+    catFormColor,
+    catFormSort,
+    setIsCategoryModalOpen,
+    setCatFormName,
+    setCatFormColor,
+    setCatFormSort,
+    handleOpenCategoryModal,
+    handleDeleteCategory,
+    handleSaveCategory,
+  } = controller;
+
   return (
     <div className="space-y-6" id="categories_view">
       <header className="bg-white rounded-2xl border border-slate-200/60 p-6 flex items-center justify-between gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]" id="categories_header">
@@ -230,4 +244,8 @@ export function CategoryPanel({
       )}
     </div>
   );
+}
+
+export function CategoryPanel({styleContext, ...controller}: CategoryPanelProps) {
+  return <CategorySection styleContext={styleContext} controller={controller} />;
 }
