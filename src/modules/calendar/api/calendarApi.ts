@@ -1,4 +1,5 @@
 import type {Task, TaskExecutionSession} from '../../../../shared/domain/entities';
+import type {TaskPriority} from '../../../../shared/domain/status';
 import {focusApi} from '../../focus/api/focusApi';
 import {tasksApi, type TaskSchedulePayload} from '../../tasks/api/tasksApi';
 
@@ -22,6 +23,8 @@ interface BaseCalendarCreateTaskInput {
   title: string;
   categoryId: number;
   plannedDate: string;
+  priority: TaskPriority | null;
+  tagIds: number[];
 }
 
 export type CalendarCreateTaskInput =

@@ -194,6 +194,8 @@ describe('useCalendarController', () => {
       title: '新任务',
       categoryId: 8,
       plannedDate: '2026-06-08',
+      tagIds: [],
+      priority: null,
       allDay: true,
     });
   });
@@ -441,6 +443,8 @@ describe('useCalendarController', () => {
       plannedEndDate: undefined,
       startAt: '2026-06-06T09:00:00.000',
       endAt: '2026-06-06T10:00:00.000',
+      tagIds: [],
+      priority: null,
       allDay: false,
     });
     expect(result.current.quickCreateDraft).toBeUndefined();
@@ -479,6 +483,8 @@ describe('useCalendarController', () => {
       plannedEndDate: '2026-06-21',
       startAt: undefined,
       endAt: undefined,
+      tagIds: [],
+      priority: null,
       allDay: true,
     });
   });

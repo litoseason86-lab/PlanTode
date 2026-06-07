@@ -5,6 +5,7 @@ import {OrganizationPanel} from '../modules/categories/components/OrganizationPa
 import {useCategoryActions} from '../modules/categories/controllers/useCategoryActions';
 import {DashboardPanel} from '../modules/dashboard/components/DashboardPanel';
 import {useDashboardController} from '../modules/dashboard/controllers/useDashboardController';
+import {useTodayQuickCreateController} from '../modules/dashboard/controllers/useTodayQuickCreateController';
 import {FocusPanel} from '../modules/focus/components/FocusPanel';
 import {useFocusSessionController} from '../modules/focus/controllers/useFocusSessionController';
 import {DailyReportPanel} from '../modules/reports/components/DailyReportPanel';
@@ -72,6 +73,14 @@ export default function AppShell() {
   const tagActions = useTagActions({
     refreshTags,
     refreshAllTasks,
+  });
+  const todayQuickCreateController = useTodayQuickCreateController({
+    categories,
+    selectedDate,
+    setLoading,
+    showToast,
+    refreshAllTasks,
+    loadTasksForSelectedDate,
   });
   const taskActions = useTaskActions({
     categories,
@@ -208,11 +217,7 @@ export default function AppShell() {
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
             todayCategoryFocusData={dashboardController.todayCategoryFocusData}
-            taskFormTitle={taskActions.taskFormTitle}
-            taskFormCategory={taskActions.taskFormCategory}
-            setTaskFormTitle={taskActions.setTaskFormTitle}
-            setTaskFormCategory={taskActions.setTaskFormCategory}
-            handleCreateTask={taskActions.handleCreateTask}
+            todayQuickCreate={todayQuickCreateController}
             handleUpdateTaskStatus={taskActions.handleUpdateTaskStatus}
             handleStartSession={focusSession.handleStartSession}
             handleStopSession={focusSession.handleStopSession}

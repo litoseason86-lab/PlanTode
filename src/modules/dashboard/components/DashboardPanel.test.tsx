@@ -33,7 +33,14 @@ const tasks = [
 
 describe('DashboardPanel', () => {
   it('submits quick task creation for the selected date and shows dashboard title', () => {
-    const onCreateTask = vi.fn();
+    const todayQuickCreate = {
+      title: '写方案',
+      categoryId: 1,
+      isCreating: false,
+      setTitle: vi.fn(),
+      setCategoryId: vi.fn(),
+      createTodayTask: vi.fn(),
+    };
 
     render(
       <DashboardPanel
@@ -43,11 +50,7 @@ describe('DashboardPanel', () => {
         selectedDate="2026-06-05"
         setSelectedDate={vi.fn()}
         todayCategoryFocusData={[{name: '工作', minutes: 20, color: '#ef4444'}]}
-        taskFormTitle="写方案"
-        taskFormCategory={1}
-        setTaskFormTitle={vi.fn()}
-        setTaskFormCategory={vi.fn()}
-        handleCreateTask={onCreateTask}
+        todayQuickCreate={todayQuickCreate}
         handleUpdateTaskStatus={vi.fn()}
         handleStartSession={vi.fn()}
         handleStopSession={vi.fn()}
@@ -62,9 +65,38 @@ describe('DashboardPanel', () => {
 
     fireEvent.click(screen.getByRole('button', {name: /快速派遣/i}));
 
-    expect(onCreateTask).toHaveBeenCalledWith(undefined, {
-      plannedDate: '2026-06-05',
-      unscheduled: false,
-    });
+    expect(todayQuickCreate.createTodayTask).toHaveBeenCalledWith();
+  });
+
+  it('disables quick-create controls while creating', () => {
+    render(
+      <DashboardPanel
+        styleContext={{primary: '#fb7185', primaryLight: '#fff1f2', secondary: '#fda4af'}}
+        categories={categories}
+        tasks={tasks}
+        selectedDate="2026-06-05"
+        setSelectedDate={vi.fn()}
+        todayCategoryFocusData={[]}
+        todayQuickCreate={{
+          title: '写方案',
+          categoryId: 1,
+          isCreating: true,
+          setTitle: vi.fn(),
+          setCategoryId: vi.fn(),
+          createTodayTask: vi.fn(),
+        }}
+        handleUpdateTaskStatus={vi.fn()}
+        handleStartSession={vi.fn()}
+        handleStopSession={vi.fn()}
+        runningSession={null}
+        lastFinishedSessionTask={null}
+        setLastFinishedSessionTask={vi.fn()}
+        getTaskFocusMinutes={() => 0}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('💡 快速添加今日行动计划...')).toBeDisabled();
+    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByRole('button', {name: /快速派遣/i})).toBeDisabled();
   });
 });

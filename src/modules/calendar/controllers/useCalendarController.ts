@@ -130,6 +130,8 @@ export function useCalendarController({categories, initialDate, showToast, onMut
         title,
         categoryId,
         plannedDate,
+        tagIds: [],
+        priority: null,
         allDay: true,
       });
       await refreshCalendarData();
@@ -159,6 +161,8 @@ export function useCalendarController({categories, initialDate, showToast, onMut
           plannedEndDate: draft.plannedEndDate,
           startAt: undefined,
           endAt: undefined,
+          tagIds: [],
+          priority: null,
           allDay: true,
         });
       } else {
@@ -169,6 +173,8 @@ export function useCalendarController({categories, initialDate, showToast, onMut
           plannedEndDate: undefined,
           startAt: draft.startAt,
           endAt: draft.endAt,
+          tagIds: [],
+          priority: null,
           allDay: false,
         });
       }

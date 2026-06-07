@@ -1,11 +1,9 @@
-import type React from 'react';
-
 import {Calendar, ClipboardList, Plus, Square} from 'lucide-react';
 import {Bar, BarChart, Cell, ResponsiveContainer} from 'recharts';
 
 import type {Category, Task, TaskExecutionSession} from '../../../../shared/domain/entities';
 import type {TaskStatus} from '../../../../shared/domain/status';
-import type {CreateTaskScheduleOverride} from '../../tasks/controllers/useTaskActions';
+import type {TodayQuickCreateController} from '../controllers/useTodayQuickCreateController';
 
 interface DashboardPanelProps {
   styleContext: {
@@ -22,11 +20,7 @@ interface DashboardPanelProps {
     minutes: number;
     color: string;
   }>;
-  taskFormTitle: string;
-  taskFormCategory: number;
-  setTaskFormTitle: (value: string) => void;
-  setTaskFormCategory: (value: number) => void;
-  handleCreateTask: (event?: React.FormEvent, scheduleOverride?: CreateTaskScheduleOverride) => void;
+  todayQuickCreate: TodayQuickCreateController;
   handleUpdateTaskStatus: (id: number, status: TaskStatus) => void;
   handleStartSession: (task: Task) => void;
   handleStopSession: () => void;
@@ -43,11 +37,7 @@ export function DashboardPanel({
   selectedDate,
   setSelectedDate,
   todayCategoryFocusData,
-  taskFormTitle,
-  taskFormCategory,
-  setTaskFormTitle,
-  setTaskFormCategory,
-  handleCreateTask,
+  todayQuickCreate,
   handleUpdateTaskStatus,
   handleStartSession,
   handleStopSession,
@@ -154,19 +144,21 @@ export function DashboardPanel({
         <input
           type="text"
           placeholder="💡 快速添加今日行动计划..."
-          value={taskFormTitle}
-          onChange={(event) => setTaskFormTitle(event.target.value)}
+          value={todayQuickCreate.title}
+          disabled={todayQuickCreate.isCreating}
+          onChange={(event) => todayQuickCreate.setTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
-              handleCreateTask(undefined, {plannedDate: selectedDate, unscheduled: false});
+              void todayQuickCreate.createTodayTask();
             }
           }}
           className="flex-1 text-sm border border-slate-200 bg-slate-50/50 p-2.5 rounded-xl outline-none focus:border-[var(--color-primary)] focus:bg-white focus:shadow-sm font-semibold transition-all text-slate-800 placeholder:text-slate-300"
         />
         <div className="flex items-center gap-2.5">
           <select
-            value={taskFormCategory}
-            onChange={(event) => setTaskFormCategory(Number(event.target.value))}
+            value={todayQuickCreate.categoryId}
+            disabled={todayQuickCreate.isCreating}
+            onChange={(event) => todayQuickCreate.setCategoryId(Number(event.target.value))}
             className="px-3 py-2 text-xs border border-slate-200 bg-white rounded-xl text-slate-600 font-semibold outline-none cursor-pointer hover:bg-slate-50 transition-colors"
           >
             {categories.map((category) => (
@@ -176,7 +168,8 @@ export function DashboardPanel({
           </select>
 
           <button
-            onClick={() => handleCreateTask(undefined, {plannedDate: selectedDate, unscheduled: false})}
+            onClick={() => void todayQuickCreate.createTodayTask()}
+            disabled={todayQuickCreate.isCreating}
             className="text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-[var(--color-primary)]/20 hover:shadow-md hover:scale-[1.02] flex items-center gap-1.5 cursor-pointer active:scale-[0.98]"
             style={{backgroundColor: styleContext.primary}}
           >
