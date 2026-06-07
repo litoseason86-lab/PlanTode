@@ -1,4 +1,4 @@
-import type { ReportGeneratorType, SessionStatus, TaskStatus } from './status';
+import type { ReportGeneratorType, SessionStatus, TaskPriority, TaskStatus } from './status';
 
 export interface User {
   id: number;
@@ -43,6 +43,8 @@ export interface Task {
   endAt?: string;
   allDay: boolean;
   status: TaskStatus;
+  priority: TaskPriority | null;
+  tagIds: number[];
   createdAt: string;
   updatedAt: string;
 }

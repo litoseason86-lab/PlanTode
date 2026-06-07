@@ -1,14 +1,16 @@
 import type {FocusSessionRepository} from '../focus/repository';
 import {AppError} from '../../shared/errors/appError';
 import type {CategoryRepository} from '../categories/repository';
+import type {TagRepository} from '../tags/repository';
 import type {
   BatchTaskScheduleInput,
   CreateTaskInput,
   ScheduledFilter,
   TaskRepository,
+  UpdateTaskDetailsInput,
   UpdateTaskScheduleInput,
 } from './repository';
-import {TASK_STATUSES, type TaskStatus} from '../../../shared/domain/status';
+import {TASK_STATUSES, type TaskPriority, type TaskStatus} from '../../../shared/domain/status';
 import {normalizeTaskSchedule, type TaskScheduleRuleInput} from './scheduleRules';
 
 interface TaskListFilters {
@@ -20,6 +22,8 @@ interface TaskListFilters {
   categoryId?: number;
   scheduled?: ScheduledFilter;
   query?: string;
+  priority?: TaskPriority | null | 'none';
+  tagIds?: number[];
 }
 
 export class TasksService {
@@ -27,6 +31,7 @@ export class TasksService {
     private readonly tasks: TaskRepository,
     private readonly categories: Pick<CategoryRepository, 'getById'>,
     private readonly focusSessions: Pick<FocusSessionRepository, 'getRunningByUser' | 'stop'>,
+    private readonly tags: Pick<TagRepository, 'getManyByIds'>,
   ) {}
 
   list(filters: TaskListFilters) {
@@ -39,7 +44,19 @@ export class TasksService {
       categoryId: filters.categoryId,
       scheduled: filters.scheduled,
       query: filters.query,
+      priority: filters.priority,
+      tagIds: filters.tagIds,
     });
+  }
+
+  private assertTagsBelongToUser(userId: number, tagIds: number[]): void {
+    if (new Set(tagIds).size !== tagIds.length) {
+      throw new AppError(400, 'tagIds must be unique');
+    }
+    const found = this.tags.getManyByIds(userId, tagIds);
+    if (found.length !== tagIds.length) {
+      throw new AppError(404, 'Tag not found');
+    }
   }
 
   private normalizeSchedule(input: {taskId: number; userId: number} & TaskScheduleRuleInput): UpdateTaskScheduleInput {
@@ -97,6 +114,8 @@ export class TasksService {
       allDay: input.allDay,
     };
     const normalizedSchedule = this.normalizeSchedule(scheduleInput);
+    const tagIds = input.tagIds ?? [];
+    this.assertTagsBelongToUser(input.userId, tagIds);
 
     return this.tasks.create({
       ...input,
@@ -106,7 +125,29 @@ export class TasksService {
       endAt: normalizedSchedule.endAt,
       allDay: normalizedSchedule.allDay,
       title,
+      priority: input.priority ?? null,
+      tagIds,
     });
+  }
+
+  updateDetails(input: UpdateTaskDetailsInput) {
+    const title = input.title.trim();
+    if (!title) {
+      throw new AppError(400, 'Task title is required');
+    }
+
+    const category = this.categories.getById(input.categoryId, input.userId);
+    if (!category) {
+      throw new AppError(404, 'Category not found');
+    }
+
+    this.assertTagsBelongToUser(input.userId, input.tagIds);
+    const updated = this.tasks.updateDetails({...input, title});
+    if (!updated) {
+      throw new AppError(404, 'Task not found');
+    }
+
+    return updated;
   }
 
   updateSchedule(input: UpdateTaskScheduleInput) {

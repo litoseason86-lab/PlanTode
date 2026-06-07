@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 
 import type {Task} from '../../../shared/domain/entities';
+import type {TagRepository} from '../tags/repository';
 import type {TaskRepository} from './repository';
 import {TasksService} from './service';
 
@@ -13,6 +14,8 @@ function existingTask(id: number, userId = 1): Task {
     plannedDate: '2026-06-06',
     allDay: true,
     status: 'TODO',
+    priority: null,
+    tagIds: [],
     createdAt: '',
     updatedAt: '',
   };
@@ -42,13 +45,24 @@ function buildTaskRepository(overrides: Partial<TaskRepository> = {}): TaskRepos
       endAt: input.endAt,
       allDay: input.allDay,
     })),
+    updateDetails: vi.fn((input) => ({
+      ...existingTask(input.taskId, input.userId),
+      title: input.title,
+      categoryId: input.categoryId,
+      priority: input.priority,
+      tagIds: input.tagIds,
+    })),
     batchUpdateSchedules: vi.fn(),
     remove: vi.fn(),
     ...overrides,
   };
 }
 
-function buildService(repository: TaskRepository, categoryExists = true) {
+function buildService(
+  repository: TaskRepository,
+  categoryExists = true,
+  tagsRepo: Pick<TagRepository, 'getManyByIds'> = {getManyByIds: vi.fn(() => [])},
+) {
   return new TasksService(
     repository,
     {
@@ -60,6 +74,7 @@ function buildService(repository: TaskRepository, categoryExists = true) {
       getRunningByUser: () => undefined,
       stop: vi.fn(),
     },
+    tagsRepo,
   );
 }
 
@@ -194,7 +209,77 @@ describe('TasksService', () => {
       startAt: undefined,
       endAt: undefined,
       allDay: true,
+      priority: null,
+      tagIds: [],
     }));
+  });
+
+  it('rejects creation with duplicate tagIds before writing', () => {
+    const repository = buildTaskRepository();
+    const service = buildService(repository);
+
+    expect(() => service.create({
+      userId: 1,
+      categoryId: 1,
+      title: '写方案',
+      tagIds: [2, 2],
+      priority: 'P1',
+    })).toThrow('tagIds must be unique');
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects details updates with tags owned by another user', () => {
+    const repository = buildTaskRepository();
+    const service = buildService(repository, true, {
+      getManyByIds: vi.fn(() => []),
+    });
+
+    expect(() => service.updateDetails({
+      taskId: 1,
+      userId: 1,
+      title: '写方案',
+      categoryId: 1,
+      tagIds: [2],
+      priority: 'P1',
+    })).toThrow('Tag not found');
+  });
+
+  it('updates task details without changing schedule or status', () => {
+    const repository = buildTaskRepository();
+    const service = buildService(repository, true, {
+      getManyByIds: vi.fn((_userId: number, tagIds: number[]) => tagIds.map((tagId) => ({
+        id: tagId,
+        userId: 1,
+        name: `标签${tagId}`,
+        createdAt: '',
+        updatedAt: '',
+      }))),
+    });
+
+    const updated = service.updateDetails({
+      taskId: 1,
+      userId: 1,
+      title: ' 新标题 ',
+      categoryId: 1,
+      tagIds: [2],
+      priority: 'P2',
+    });
+
+    expect(repository.updateDetails).toHaveBeenCalledWith({
+      taskId: 1,
+      userId: 1,
+      title: '新标题',
+      categoryId: 1,
+      tagIds: [2],
+      priority: 'P2',
+    });
+    expect(updated).toMatchObject({
+      title: '新标题',
+      plannedDate: '2026-06-06',
+      status: 'TODO',
+      priority: 'P2',
+      tagIds: [2],
+    });
   });
 
   it('rejects task creation without plannedDate when plannedEndDate is present', () => {

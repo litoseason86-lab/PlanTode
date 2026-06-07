@@ -6,6 +6,8 @@ import {afterEach, describe, expect, it} from 'vitest';
 
 import {createEmptyDatabaseSchema} from '../../databaseSchema';
 import {JsonFileStore} from '../fileStore';
+import {CategoryJsonRepository} from './categoryJsonRepository';
+import {TagJsonRepository} from './tagJsonRepository';
 import {TaskJsonRepository} from './taskJsonRepository';
 
 const createdPaths: string[] = [];
@@ -41,6 +43,8 @@ describe('TaskJsonRepository', () => {
         plannedDate: '2026-06-05',
         allDay: true,
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '2026-06-05T08:00:00.000Z',
         updatedAt: '2026-06-05T08:00:00.000Z',
       },
@@ -52,6 +56,8 @@ describe('TaskJsonRepository', () => {
         plannedDate: '2026-06-06',
         allDay: true,
         status: 'DONE',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '2026-06-05T09:00:00.000Z',
         updatedAt: '2026-06-05T09:00:00.000Z',
       },
@@ -63,6 +69,8 @@ describe('TaskJsonRepository', () => {
         plannedDate: '2026-06-05',
         allDay: true,
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '2026-06-05T10:00:00.000Z',
         updatedAt: '2026-06-05T10:00:00.000Z',
       },
@@ -127,6 +135,8 @@ describe('TaskJsonRepository', () => {
         plannedDate: '2026-06-05',
         allDay: true,
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '2026-06-05T08:00:00.000Z',
         updatedAt: '2026-06-05T08:00:00.000Z',
       },
@@ -138,6 +148,8 @@ describe('TaskJsonRepository', () => {
         plannedDate: '2026-06-05',
         allDay: true,
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '2026-06-05T09:00:00.000Z',
         updatedAt: '2026-06-05T09:00:00.000Z',
       },
@@ -181,8 +193,8 @@ describe('TaskJsonRepository', () => {
       users: [],
       categories: [],
       tasks: [
-        {id: 1, userId: 1, categoryId: 1, title: 'Legacy', plannedDate: '2026-06-06', status: 'TODO', createdAt: '', updatedAt: ''} as never,
-        {id: 2, userId: 1, categoryId: 1, title: 'Cross', plannedDate: '2026-06-05', plannedEndDate: '2026-06-07', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+        {id: 1, userId: 1, categoryId: 1, title: 'Legacy', plannedDate: '2026-06-06', status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''} as never,
+        {id: 2, userId: 1, categoryId: 1, title: 'Cross', plannedDate: '2026-06-05', plannedEndDate: '2026-06-07', allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
       ],
       taskExecutionSessions: [],
       dailyReports: [],
@@ -254,9 +266,9 @@ describe('TaskJsonRepository', () => {
     const store = new JsonFileStore(filePath);
     const schema = createEmptyDatabaseSchema();
     schema.tasks = [
-      {id: 1, userId: 1, categoryId: 1, title: '写周报', plannedDate: '2026-06-06', allDay: true, status: 'TODO', createdAt: '1', updatedAt: '1'},
-      {id: 2, userId: 1, categoryId: 1, title: '周报跨天', plannedDate: '2026-06-06', plannedEndDate: '2026-06-07', allDay: true, status: 'TODO', createdAt: '2', updatedAt: '2'},
-      {id: 3, userId: 1, categoryId: 1, title: '会议周报', plannedDate: '2026-06-06', startAt: '2026-06-06T09:00:00.000', endAt: '2026-06-06T10:00:00.000', allDay: false, status: 'TODO', createdAt: '3', updatedAt: '3'},
+      {id: 1, userId: 1, categoryId: 1, title: '写周报', plannedDate: '2026-06-06', allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '1', updatedAt: '1'},
+      {id: 2, userId: 1, categoryId: 1, title: '周报跨天', plannedDate: '2026-06-06', plannedEndDate: '2026-06-07', allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '2', updatedAt: '2'},
+      {id: 3, userId: 1, categoryId: 1, title: '会议周报', plannedDate: '2026-06-06', startAt: '2026-06-06T09:00:00.000', endAt: '2026-06-06T10:00:00.000', allDay: false, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '3', updatedAt: '3'},
     ];
     schema.sequences.tasks = 3;
     store.write(schema);
@@ -299,5 +311,59 @@ describe('TaskJsonRepository', () => {
     ])).toThrow('Task not found');
 
     expect(repository.getById(first.id, 1)?.plannedDate).toBeUndefined();
+  });
+
+  it('creates tasks with priority and tagIds, then filters by all selected tags', () => {
+    const filePath = createTempFilePath();
+    const store = new JsonFileStore(filePath);
+    const categories = new CategoryJsonRepository(store);
+    const tags = new TagJsonRepository(store);
+    const tasks = new TaskJsonRepository(store);
+    const category = categories.create({userId: 1, name: '工作', color: '#3b82f6', sortOrder: 1});
+    const tagA = tags.createOrReuse({userId: 1, name: '客户A', normalizedName: '客户a'});
+    const tagB = tags.createOrReuse({userId: 1, name: '项目B', normalizedName: '项目b'});
+
+    const first = tasks.create({
+      userId: 1,
+      categoryId: category.id,
+      title: 'A',
+      priority: 'P1',
+      tagIds: [tagA.id, tagB.id],
+    });
+    tasks.create({userId: 1, categoryId: category.id, title: 'B', priority: null, tagIds: [tagA.id]});
+
+    expect(first).toMatchObject({priority: 'P1', tagIds: [tagA.id, tagB.id]});
+    expect(tasks.getById(first.id, 1)).toMatchObject({priority: 'P1', tagIds: [tagA.id, tagB.id]});
+    expect(tasks.listByFilters({userId: 1, tagIds: [tagA.id, tagB.id]}).map((task) => task.title)).toEqual(['A']);
+    expect(tasks.listByFilters({userId: 1, priority: 'none'}).map((task) => task.title)).toEqual(['B']);
+  });
+
+  it('updates task details as a full replacement', () => {
+    const filePath = createTempFilePath();
+    const store = new JsonFileStore(filePath);
+    const categories = new CategoryJsonRepository(store);
+    const tags = new TagJsonRepository(store);
+    const tasks = new TaskJsonRepository(store);
+    const category = categories.create({userId: 1, name: '工作', color: '#3b82f6', sortOrder: 1});
+    const tagA = tags.createOrReuse({userId: 1, name: '客户A', normalizedName: '客户a'});
+
+    const task = tasks.create({
+      userId: 1,
+      categoryId: category.id,
+      title: '旧标题',
+      priority: 'P2',
+      tagIds: [tagA.id],
+    });
+    const updated = tasks.updateDetails({
+      taskId: task.id,
+      userId: 1,
+      title: '新标题',
+      categoryId: category.id,
+      priority: null,
+      tagIds: [] as number[],
+    });
+
+    expect(updated).toMatchObject({title: '新标题', priority: null, tagIds: []});
+    expect(tasks.getById(task.id, 1)).toMatchObject({title: '新标题', priority: null, tagIds: []});
   });
 });

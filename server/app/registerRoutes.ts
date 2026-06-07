@@ -18,7 +18,12 @@ export function registerRoutes(): Router {
 
   const categoriesService = new CategoriesService(repositories.categories, repositories.tasks);
   const tagsService = new TagsService(repositories.tags);
-  const tasksService = new TasksService(repositories.tasks, repositories.categories, repositories.focusSessions);
+  const tasksService = new TasksService(
+    repositories.tasks,
+    repositories.categories,
+    repositories.focusSessions,
+    repositories.tags,
+  );
   const focusService = new FocusService(repositories.tasks, repositories.focusSessions);
   const reportsService = new ReportsService(
     repositories.reports,

@@ -4,17 +4,20 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {openSqliteClient} from '../sqliteClient';
 import {createTestSqliteFile, type TestSqliteFile} from '../testSqlite';
 import {CategorySqliteRepository} from './categorySqliteRepository';
+import {TagSqliteRepository} from './tagSqliteRepository';
 import {TaskSqliteRepository} from './taskSqliteRepository';
 
 let sqliteFile: TestSqliteFile;
 let db: Database.Database;
 let categories: CategorySqliteRepository;
+let tags: TagSqliteRepository;
 let tasks: TaskSqliteRepository;
 
 beforeEach(() => {
   sqliteFile = createTestSqliteFile('plantodo-task-repository');
   db = openSqliteClient(sqliteFile.filePath);
   categories = new CategorySqliteRepository(db);
+  tags = new TagSqliteRepository(db);
   tasks = new TaskSqliteRepository(db);
 });
 
@@ -189,5 +192,49 @@ describe('TaskSqliteRepository', () => {
     ])).toThrow('Task not found');
 
     expect(tasks.getById(first.id, 1)?.plannedDate).toBeUndefined();
+  });
+
+  it('creates tasks with priority and tagIds, then filters by all selected tags', () => {
+    const category = categories.create({userId: 1, name: '工作', color: '#3b82f6', sortOrder: 1});
+    const tagA = tags.createOrReuse({userId: 1, name: '客户A', normalizedName: '客户a'});
+    const tagB = tags.createOrReuse({userId: 1, name: '项目B', normalizedName: '项目b'});
+
+    const first = tasks.create({
+      userId: 1,
+      categoryId: category.id,
+      title: 'A',
+      priority: 'P1',
+      tagIds: [tagA.id, tagB.id],
+    });
+    tasks.create({userId: 1, categoryId: category.id, title: 'B', priority: null, tagIds: [tagA.id]});
+
+    expect(first).toMatchObject({priority: 'P1', tagIds: [tagA.id, tagB.id]});
+    expect(tasks.getById(first.id, 1)).toMatchObject({priority: 'P1', tagIds: [tagA.id, tagB.id]});
+    expect(tasks.listByFilters({userId: 1, tagIds: [tagA.id, tagB.id]}).map((task) => task.title)).toEqual(['A']);
+    expect(tasks.listByFilters({userId: 1, priority: 'none'}).map((task) => task.title)).toEqual(['B']);
+  });
+
+  it('updates task details as a full replacement', () => {
+    const category = categories.create({userId: 1, name: '工作', color: '#3b82f6', sortOrder: 1});
+    const tagA = tags.createOrReuse({userId: 1, name: '客户A', normalizedName: '客户a'});
+
+    const task = tasks.create({
+      userId: 1,
+      categoryId: category.id,
+      title: '旧标题',
+      priority: 'P2',
+      tagIds: [tagA.id],
+    });
+    const updated = tasks.updateDetails({
+      taskId: task.id,
+      userId: 1,
+      title: '新标题',
+      categoryId: category.id,
+      priority: null,
+      tagIds: [],
+    });
+
+    expect(updated).toMatchObject({title: '新标题', priority: null, tagIds: []});
+    expect(tasks.getById(task.id, 1)).toMatchObject({title: '新标题', priority: null, tagIds: []});
   });
 });

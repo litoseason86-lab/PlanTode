@@ -6,7 +6,7 @@ import {readCalendarDragPayload} from '../controllers/schedulingDrag';
 import {SchedulingSidebar} from './SchedulingSidebar';
 
 const categories = [{id: 1, userId: 1, name: '工作', color: '#ef4444', sortOrder: 1, createdAt: '', updatedAt: ''}];
-const unscheduledTask = {id: 1, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', createdAt: '', updatedAt: ''} as const;
+const unscheduledTask = {id: 1, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''} as const;
 const dateTask = {...unscheduledTask, id: 2, title: '全天任务', plannedDate: '2026-06-06'} as const;
 
 function createDragData() {

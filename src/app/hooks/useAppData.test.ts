@@ -33,6 +33,8 @@ function task(id: number, title: string, plannedDate: string): Task {
     plannedDate,
     allDay: true,
     status: 'TODO',
+    priority: null,
+    tagIds: [] as number[],
     createdAt: '',
     updatedAt: '',
   };

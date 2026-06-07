@@ -17,6 +17,8 @@ const baseTask: Omit<Task, 'plannedDate' | 'allDay'> & {plannedDate?: string; al
   title: '写方案',
   plannedDate: '2026-06-06',
   status: 'TODO',
+  priority: null,
+  tagIds: [] as number[],
   createdAt: '2026-06-06T00:00:00.000Z',
   updatedAt: '2026-06-06T00:00:00.000Z',
 };
@@ -29,6 +31,23 @@ describe('schedule helpers', () => {
       plannedEndDate: undefined,
       startAt: undefined,
       endAt: undefined,
+    });
+  });
+
+  it('normalizes legacy tasks to null priority and empty tagIds', () => {
+    expect(toCanonicalTask({
+      id: 1,
+      userId: 1,
+      categoryId: 1,
+      title: '旧任务',
+      status: 'TODO',
+      priority: null,
+      tagIds: [] as number[],
+      createdAt: '2026-06-07T00:00:00.000Z',
+      updatedAt: '2026-06-07T00:00:00.000Z',
+    })).toMatchObject({
+      priority: null,
+      tagIds: [] as number[],
     });
   });
 

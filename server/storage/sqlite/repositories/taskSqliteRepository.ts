@@ -4,6 +4,7 @@ import type {
   CreateTaskInput,
   TaskFilters,
   TaskRepository,
+  UpdateTaskDetailsInput,
   UpdateTaskScheduleInput,
 } from '../../../modules/tasks/repository';
 import type {Task} from '../../../../shared/domain/entities';
@@ -18,6 +19,37 @@ function escapeLike(value: string): string {
 export class TaskSqliteRepository implements TaskRepository {
   constructor(private readonly db: Database.Database) {}
 
+  private loadTagIdsByTaskId(userId: number, taskIds: number[]): Map<number, number[]> {
+    if (taskIds.length === 0) {
+      return new Map();
+    }
+
+    const placeholders = taskIds.map(() => '?').join(', ');
+    const rows = this.db
+      .prepare(`select task_id, tag_id from task_tags where user_id = ? and task_id in (${placeholders}) order by task_id asc, rowid asc`)
+      .all(userId, ...taskIds) as Array<{task_id: number; tag_id: number}>;
+    const tagIdsByTaskId = new Map<number, number[]>();
+
+    for (const row of rows) {
+      const tagIds = tagIdsByTaskId.get(row.task_id) ?? [];
+      tagIds.push(row.tag_id);
+      tagIdsByTaskId.set(row.task_id, tagIds);
+    }
+
+    return tagIdsByTaskId;
+  }
+
+  private loadTagIdsForTask(userId: number, taskId: number): number[] {
+    return this.loadTagIdsByTaskId(userId, [taskId]).get(taskId) ?? [];
+  }
+
+  private insertTaskTags(input: {taskId: number; userId: number; tagIds: number[]; createdAt: string}): void {
+    const insert = this.db.prepare('insert into task_tags (task_id, tag_id, user_id, created_at) values (?, ?, ?, ?)');
+    for (const tagId of input.tagIds) {
+      insert.run(input.taskId, tagId, input.userId, input.createdAt);
+    }
+  }
+
   listByFilters(filters: TaskFilters): Task[] {
     const clauses = ['user_id = ?'];
     const values: Array<string | number> = [filters.userId];
@@ -28,6 +60,23 @@ export class TaskSqliteRepository implements TaskRepository {
     if (filters.categoryId) {
       clauses.push('category_id = ?');
       values.push(filters.categoryId);
+    }
+    if (filters.priority === 'none') {
+      clauses.push('priority is null');
+    } else if (filters.priority) {
+      clauses.push('priority = ?');
+      values.push(filters.priority);
+    }
+    if (filters.tagIds?.length) {
+      const placeholders = filters.tagIds.map(() => '?').join(', ');
+      clauses.push(`id in (
+        select task_id
+        from task_tags
+        where user_id = ? and tag_id in (${placeholders})
+        group by task_id
+        having count(distinct tag_id) = ?
+      )`);
+      values.push(filters.userId, ...filters.tagIds, filters.tagIds.length);
     }
     if (filters.scheduled === 'unscheduled') {
       clauses.push('planned_date is null');
@@ -69,8 +118,9 @@ export class TaskSqliteRepository implements TaskRepository {
     const rows = this.db
       .prepare(`select * from tasks where ${clauses.join(' and ')} order by created_at asc`)
       .all(...values) as TaskRow[];
+    const tagIdsByTaskId = this.loadTagIdsByTaskId(filters.userId, rows.map((row) => row.id));
 
-    return rows.map(mapTaskRow).filter((task) => {
+    return rows.map((row) => mapTaskRow(row, tagIdsByTaskId.get(row.id) ?? [])).filter((task) => {
       if (filters.plannedDate && !taskIntersectsDateRange(task, filters.plannedDate, filters.plannedDate)) return false;
       if (filters.dateFrom && filters.dateTo && !taskIntersectsDateRange(task, filters.dateFrom, filters.dateTo)) return false;
       return true;
@@ -81,31 +131,56 @@ export class TaskSqliteRepository implements TaskRepository {
     const row = this.db
       .prepare('select * from tasks where id = ? and user_id = ?')
       .get(taskId, userId) as TaskRow | undefined;
-    return row ? mapTaskRow(row) : undefined;
+    return row ? mapTaskRow(row, this.loadTagIdsForTask(userId, taskId)) : undefined;
   }
 
   create(input: CreateTaskInput): Task {
-    const now = new Date().toISOString();
-    const result = this.db
-      .prepare(`
-        insert into tasks (
-          user_id, category_id, title, planned_date, planned_end_date, start_at, end_at, all_day, status, created_at, updated_at
-        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        input.userId,
-        input.categoryId,
-        input.title.trim(),
-        input.plannedDate ?? null,
-        input.plannedDate && (input.allDay ?? true) ? input.plannedEndDate ?? null : null,
-        input.plannedDate && input.allDay === false ? input.startAt ?? null : null,
-        input.plannedDate && input.allDay === false ? input.endAt ?? null : null,
-        input.plannedDate && input.allDay === false ? 0 : 1,
-        'TODO',
-        now,
-        now,
-      );
-    return this.getById(Number(result.lastInsertRowid), input.userId)!;
+    const createTask = this.db.transaction(() => {
+      const now = new Date().toISOString();
+      const result = this.db
+        .prepare(`
+          insert into tasks (
+            user_id, category_id, title, planned_date, planned_end_date, start_at, end_at, all_day, priority, status, created_at, updated_at
+          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+        .run(
+          input.userId,
+          input.categoryId,
+          input.title.trim(),
+          input.plannedDate ?? null,
+          input.plannedDate && (input.allDay ?? true) ? input.plannedEndDate ?? null : null,
+          input.plannedDate && input.allDay === false ? input.startAt ?? null : null,
+          input.plannedDate && input.allDay === false ? input.endAt ?? null : null,
+          input.plannedDate && input.allDay === false ? 0 : 1,
+          input.priority ?? null,
+          'TODO',
+          now,
+          now,
+        );
+      const taskId = Number(result.lastInsertRowid);
+      this.insertTaskTags({taskId, userId: input.userId, tagIds: input.tagIds ?? [], createdAt: now});
+      return taskId;
+    });
+
+    return this.getById(createTask(), input.userId)!;
+  }
+
+  updateDetails(input: UpdateTaskDetailsInput): Task | undefined {
+    const updateTaskDetails = this.db.transaction(() => {
+      const now = new Date().toISOString();
+      const result = this.db
+        .prepare('update tasks set title = ?, category_id = ?, priority = ?, updated_at = ? where id = ? and user_id = ?')
+        .run(input.title.trim(), input.categoryId, input.priority, now, input.taskId, input.userId);
+      if (result.changes === 0) {
+        return false;
+      }
+
+      this.db.prepare('delete from task_tags where task_id = ? and user_id = ?').run(input.taskId, input.userId);
+      this.insertTaskTags({taskId: input.taskId, userId: input.userId, tagIds: input.tagIds, createdAt: now});
+      return true;
+    });
+
+    return updateTaskDetails() ? this.getById(input.taskId, input.userId) : undefined;
   }
 
   updateStatus(taskId: number, userId: number, status: TaskStatus): Task | undefined {
@@ -168,6 +243,7 @@ export class TaskSqliteRepository implements TaskRepository {
   remove(taskId: number, userId: number): boolean {
     const removeTask = this.db.transaction(() => {
       this.db.prepare('delete from task_execution_sessions where task_id = ? and user_id = ?').run(taskId, userId);
+      this.db.prepare('delete from task_tags where task_id = ? and user_id = ?').run(taskId, userId);
       return this.db.prepare('delete from tasks where id = ? and user_id = ?').run(taskId, userId).changes > 0;
     });
 

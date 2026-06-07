@@ -1,5 +1,5 @@
 import type {Task} from '../../../shared/domain/entities';
-import type {TaskStatus} from '../../../shared/domain/status';
+import type {TaskPriority, TaskStatus} from '../../../shared/domain/status';
 
 export type ScheduledFilter = 'unscheduled' | 'scheduled' | 'all-day-without-time';
 
@@ -12,6 +12,8 @@ export interface TaskFilters {
   categoryId?: number;
   scheduled?: ScheduledFilter;
   query?: string;
+  priority?: TaskPriority | null | 'none';
+  tagIds?: number[];
 }
 
 export interface CreateTaskInput {
@@ -23,6 +25,8 @@ export interface CreateTaskInput {
   startAt?: string;
   endAt?: string;
   allDay?: boolean;
+  priority?: TaskPriority | null;
+  tagIds?: number[];
 }
 
 export interface UpdateTaskScheduleInput {
@@ -37,10 +41,20 @@ export interface UpdateTaskScheduleInput {
 
 export interface BatchTaskScheduleInput extends UpdateTaskScheduleInput {}
 
+export interface UpdateTaskDetailsInput {
+  taskId: number;
+  userId: number;
+  title: string;
+  categoryId: number;
+  priority: TaskPriority | null;
+  tagIds: number[];
+}
+
 export interface TaskRepository {
   listByFilters(filters: TaskFilters): Task[];
   getById(taskId: number, userId: number): Task | undefined;
   create(input: CreateTaskInput): Task;
+  updateDetails(input: UpdateTaskDetailsInput): Task | undefined;
   updateStatus(taskId: number, userId: number, status: TaskStatus): Task | undefined;
   updateSchedule(input: UpdateTaskScheduleInput): Task | undefined;
   batchUpdateSchedules(inputs: BatchTaskScheduleInput[]): Task[];

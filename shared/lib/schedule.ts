@@ -1,13 +1,16 @@
 import type {Task} from '../domain/entities';
+import type {TaskPriority} from '../domain/status';
 import {addIsoDateDays, isIsoDateString} from './date';
 
 export type TaskScheduleKind = 'unscheduled' | 'date' | 'cross-day' | 'timed';
-export type LegacyTask = Omit<Task, 'plannedDate' | 'allDay'> & {
+export type LegacyTask = Omit<Task, 'plannedDate' | 'allDay' | 'priority' | 'tagIds'> & {
   plannedDate?: string;
   allDay?: boolean;
   plannedEndDate?: string;
   startAt?: string;
   endAt?: string;
+  priority?: TaskPriority | null;
+  tagIds?: number[];
 };
 
 const LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000$/;
@@ -49,6 +52,13 @@ export function getLocalDateFromDateTime(value: string): string {
   return value.slice(0, 10);
 }
 
+function withStableTaskMetadata(task: LegacyTask): Pick<Task, 'priority' | 'tagIds'> {
+  return {
+    priority: task.priority ?? null,
+    tagIds: task.tagIds ?? [],
+  };
+}
+
 export function toCanonicalTask(task: LegacyTask): Task {
   if (!task.plannedDate) {
     return {
@@ -58,6 +68,7 @@ export function toCanonicalTask(task: LegacyTask): Task {
       startAt: undefined,
       endAt: undefined,
       allDay: true,
+      ...withStableTaskMetadata(task),
     };
   }
 
@@ -69,6 +80,7 @@ export function toCanonicalTask(task: LegacyTask): Task {
     plannedEndDate: allDay ? task.plannedEndDate || undefined : undefined,
     startAt: allDay ? undefined : task.startAt || undefined,
     endAt: allDay ? undefined : task.endAt || undefined,
+    ...withStableTaskMetadata(task),
   };
 }
 

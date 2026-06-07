@@ -14,6 +14,8 @@ const weeklyDay = {
       plannedDate: '2026-06-01',
       allDay: true,
       status: 'DONE' as const,
+      priority: null,
+      tagIds: [] as number[],
       createdAt: '',
       updatedAt: '',
     },

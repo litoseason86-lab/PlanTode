@@ -33,6 +33,8 @@ const createdTask: Task = {
   plannedDate: '2026-06-07',
   allDay: true,
   status: 'TODO',
+  priority: null,
+  tagIds: [] as number[],
   createdAt: '',
   updatedAt: '',
 };

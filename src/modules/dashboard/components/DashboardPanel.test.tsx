@@ -24,6 +24,8 @@ const tasks = [
     plannedDate: '2026-06-05',
     allDay: true,
     status: 'TODO' as const,
+    priority: null,
+    tagIds: [] as number[],
     createdAt: '',
     updatedAt: '',
   },

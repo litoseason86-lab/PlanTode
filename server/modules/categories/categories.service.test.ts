@@ -58,6 +58,8 @@ describe('CategoriesService', () => {
             plannedDate: '2026-06-05',
             allDay: true,
             status: 'TODO',
+            priority: null,
+            tagIds: [] as number[],
             createdAt: '',
             updatedAt: '',
           },

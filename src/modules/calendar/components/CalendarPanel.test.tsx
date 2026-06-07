@@ -67,10 +67,10 @@ function renderCalendarPanelWithSidebarTasks(overrides: Partial<Parameters<typeo
   vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
   vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
   vi.mocked(calendarApi.getUnscheduledTasks).mockResolvedValue([
-    {id: 10, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+    {id: 10, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
   ] as never);
   vi.mocked(calendarApi.getAllDayWithoutTimeTasks).mockResolvedValue([
-    {id: 11, userId: 1, categoryId: 1, title: '全天任务', plannedDate: '2026-06-06', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+    {id: 11, userId: 1, categoryId: 1, title: '全天任务', plannedDate: '2026-06-06', allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
   ] as never);
   return renderCalendarPanel(overrides);
 }
@@ -156,7 +156,7 @@ describe('CalendarPanel', () => {
     vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 10} as never);
     vi.mocked(calendarApi.getUnscheduledTasks)
       .mockResolvedValueOnce([
-        {id: 10, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+        {id: 10, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
       ] as never)
       .mockResolvedValueOnce([] as never);
     vi.mocked(calendarApi.getAllDayWithoutTimeTasks).mockResolvedValue([] as never);
@@ -176,7 +176,7 @@ describe('CalendarPanel', () => {
 
   it('renders month tasks', async () => {
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([
-      {id: 1, userId: 1, categoryId: 1, title: '写方案', plannedDate: '2026-06-06', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+      {id: 1, userId: 1, categoryId: 1, title: '写方案', plannedDate: '2026-06-06', allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
     ]);
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
 
@@ -194,7 +194,7 @@ describe('CalendarPanel', () => {
 
   it('hides completed tasks from settings', async () => {
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([
-      {id: 1, userId: 1, categoryId: 1, title: '完成任务', plannedDate: '2026-06-06', allDay: true, status: 'DONE', createdAt: '', updatedAt: ''},
+      {id: 1, userId: 1, categoryId: 1, title: '完成任务', plannedDate: '2026-06-06', allDay: true, status: 'DONE', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
     ]);
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
 
@@ -234,7 +234,7 @@ describe('CalendarPanel', () => {
 
   it('drags a task to a month date cell', async () => {
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([
-      {id: 1, userId: 1, categoryId: 1, title: '拖拽任务', plannedDate: '2026-06-06', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+      {id: 1, userId: 1, categoryId: 1, title: '拖拽任务', plannedDate: '2026-06-06', allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
     ]);
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
     vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
@@ -265,7 +265,7 @@ describe('CalendarPanel', () => {
 
   it('drops an all-day task onto the week timeline', async () => {
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([
-      {id: 1, userId: 1, categoryId: 1, title: '安排会议', plannedDate: '2026-06-06', allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+      {id: 1, userId: 1, categoryId: 1, title: '安排会议', plannedDate: '2026-06-06', allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
     ]);
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
     vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 1} as never);
@@ -306,6 +306,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T09:00:00.000',
         endAt: '2026-06-06T10:30:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -349,6 +351,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T13:00:00.000',
         endAt: '2026-06-06T15:30:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -382,6 +386,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T23:00:00.000',
         endAt: '2026-06-07T02:00:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -415,6 +421,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T13:00:00.000',
         endAt: '2026-06-06T14:00:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -428,6 +436,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T13:30:00.000',
         endAt: '2026-06-06T14:30:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -462,6 +472,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T02:00:00.000',
         endAt: '2026-06-06T02:45:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -475,6 +487,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T02:00:00.000',
         endAt: '2026-06-06T02:45:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -514,6 +528,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T09:00:00.000',
         endAt: '2026-06-06T10:00:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -560,6 +576,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T17:00:00.000',
         endAt: '2026-06-06T18:00:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -652,6 +670,8 @@ describe('CalendarPanel', () => {
         startAt: '2026-06-06T09:00:00.000',
         endAt: '2026-06-06T10:00:00.000',
         status: 'TODO',
+        priority: null,
+        tagIds: [] as number[],
         createdAt: '',
         updatedAt: '',
       },
@@ -713,7 +733,7 @@ describe('CalendarPanel', () => {
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
     vi.mocked(calendarApi.getUnscheduledTasks)
       .mockResolvedValueOnce([
-        {id: 10, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', createdAt: '', updatedAt: ''},
+        {id: 10, userId: 1, categoryId: 1, title: '未安排任务', plannedDate: undefined, allDay: true, status: 'TODO', priority: null, tagIds: [] as number[], createdAt: '', updatedAt: ''},
       ] as never)
       .mockResolvedValue([] as never);
     vi.mocked(calendarApi.createCalendarTask).mockResolvedValue({id: 99} as never);
