@@ -60,7 +60,7 @@ const tasks = [
 
 function renderDashboard(overrides: Partial<ComponentProps<typeof DashboardPanel>> = {}) {
   const props: ComponentProps<typeof DashboardPanel> = {
-    styleContext: {primary: '#fb7185', primaryLight: '#fff1f2', secondary: '#fda4af'},
+    styleContext: {primary: '#fb7185', primaryLight: '#fff1f2'},
     categories,
     tasks,
     selectedDate: '2026-06-05',
@@ -125,6 +125,7 @@ describe('DashboardPanel', () => {
     });
 
     expect(screen.getByText('今日规划时空轴')).toBeInTheDocument();
+    expect(screen.getByLabelText('聚焦日期')).toHaveValue('2026-06-05');
 
     fireEvent.click(screen.getByRole('button', {name: /快速派遣/i}));
 
@@ -143,8 +144,8 @@ describe('DashboardPanel', () => {
       },
     });
 
-    expect(screen.getByPlaceholderText('💡 快速添加今日行动计划...')).toBeDisabled();
-    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByRole('textbox', {name: '快速添加今日行动计划'})).toBeDisabled();
+    expect(screen.getByRole('combobox', {name: '今日行动分类'})).toBeDisabled();
     expect(screen.getByRole('button', {name: /快速派遣/i})).toBeDisabled();
   });
 

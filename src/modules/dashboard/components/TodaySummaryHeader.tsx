@@ -40,6 +40,7 @@ export function TodaySummaryHeader({
           <span className="font-semibold text-slate-600">聚焦选期:</span>
           <input
             type="date"
+            aria-label="聚焦日期"
             value={selectedDate}
             onChange={(event) => setSelectedDate(event.target.value)}
             className="bg-slate-50 border border-slate-200 outline-none hover:border-slate-300 focus:border-[var(--color-primary)] px-3 py-1.5 font-mono rounded-xl text-xs text-slate-700 font-bold transition-colors"

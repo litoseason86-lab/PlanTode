@@ -15,7 +15,6 @@ interface DashboardPanelProps {
   styleContext: {
     primary: string;
     primaryLight: string;
-    secondary: string;
   };
   categories: Category[];
   tasks: Task[];

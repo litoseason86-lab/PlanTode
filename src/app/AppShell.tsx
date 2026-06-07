@@ -211,7 +211,7 @@ export default function AppShell() {
       <main className="max-w-[1280px] mx-auto px-6 mt-8 space-y-6" id="main_content">
         {activeTab === 'today' && (
           <DashboardPanel
-            styleContext={{primary: styleContext.primary, primaryLight: styleContext.primaryLight, secondary: styleContext.secondary}}
+            styleContext={{primary: styleContext.primary, primaryLight: styleContext.primaryLight}}
             categories={categories}
             tasks={tasks}
             selectedDate={selectedDate}

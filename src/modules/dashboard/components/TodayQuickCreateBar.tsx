@@ -14,6 +14,7 @@ export function TodayQuickCreateBar({categories, primaryColor, todayQuickCreate}
     <div className="bg-white border border-slate-200/60 rounded-2xl p-4 flex flex-wrap items-center gap-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
       <input
         type="text"
+        aria-label="快速添加今日行动计划"
         placeholder="💡 快速添加今日行动计划..."
         value={todayQuickCreate.title}
         disabled={todayQuickCreate.isCreating}
@@ -27,6 +28,7 @@ export function TodayQuickCreateBar({categories, primaryColor, todayQuickCreate}
       />
       <div className="flex flex-wrap items-center gap-2.5">
         <select
+          aria-label="今日行动分类"
           value={todayQuickCreate.categoryId}
           disabled={todayQuickCreate.isCreating}
           onChange={(event) => todayQuickCreate.setCategoryId(Number(event.target.value))}
