@@ -159,6 +159,24 @@ function taskSegmentAriaLabel(input: {
   return `${input.segment.date} ${taskSegmentLabel(input.task, input.segment)}${focusLabel}`;
 }
 
+function allDaySegmentAriaLabel(input: {
+  task: Task;
+  segment: {
+    startsOn: string;
+    endsOn: string;
+    continuesBefore: boolean;
+    continuesAfter: boolean;
+  };
+}): string {
+  const baseLabel = `${input.segment.startsOn} 至 ${input.segment.endsOn} ${input.task.title}`;
+  const continuationLabels = [
+    input.segment.continuesBefore ? '从本周前开始' : undefined,
+    input.segment.continuesAfter ? '持续到本周后' : undefined,
+  ].filter(Boolean);
+
+  return continuationLabels.length > 0 ? `${baseLabel}，${continuationLabels.join('，')}` : baseLabel;
+}
+
 function getAllDayDropDate(input: {
   clientX: number;
   days: {isoDate: string}[];
@@ -424,12 +442,17 @@ export function WeekTimelineView({
             if (!task) {
               return null;
             }
+            const segmentLabel = allDaySegmentAriaLabel({task, segment});
 
             return (
               <div
                 key={`${segment.taskId}-${segment.startsOn}-${segment.endsOn}`}
                 draggable
-                aria-label={`${segment.startsOn} 至 ${segment.endsOn} ${task.title}`}
+                aria-label={segmentLabel}
+                data-visible-start={segment.startsOn}
+                data-visible-end={segment.endsOn}
+                data-continues-before={String(segment.continuesBefore)}
+                data-continues-after={String(segment.continuesAfter)}
                 onDragStart={(event) => writeCalendarDragPayload(event.dataTransfer, {type: 'calendar-task', taskId: task.id, source: 'calendar'})}
                 onPointerUp={handleAllDaySegmentPointerUp}
                 onDragOver={(event) => event.preventDefault()}
@@ -445,7 +468,11 @@ export function WeekTimelineView({
                     layerElement,
                   }));
                 }}
-                className="pointer-events-auto mx-1 truncate rounded px-2 py-1 text-[11px] font-bold text-white shadow-sm"
+                className={[
+                  'pointer-events-auto mx-1 truncate rounded px-2 py-1 text-[11px] font-bold text-white shadow-sm',
+                  segment.continuesBefore ? 'rounded-l-none border-l-2 border-white/70 pl-1.5' : '',
+                  segment.continuesAfter ? 'rounded-r-none border-r-2 border-white/70 pr-1.5' : '',
+                ].filter(Boolean).join(' ')}
                 style={{
                   gridColumn: `${segment.startIndex + 2} / span ${segment.span}`,
                   gridRow: segment.rowIndex + 1,

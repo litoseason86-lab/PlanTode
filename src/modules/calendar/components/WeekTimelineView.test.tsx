@@ -303,6 +303,26 @@ describe('WeekTimelineView', () => {
     expect(screen.getByLabelText('2026-06-06 09:00')).toHaveStyle({height: '88px'});
   });
 
+  for (const {density, slotHeight} of [
+    {density: 'compact' as const, slotHeight: 48},
+    {density: 'comfortable' as const, slotHeight: 88},
+  ]) {
+    it(`uses ${density} slot height when converting a sidebar task drop`, () => {
+      const onScheduleTime = vi.fn().mockResolvedValue(true);
+      renderWeek({weekTimelineDensity: density, onScheduleTime});
+      const slot = screen.getByLabelText('2026-06-06 09:00');
+      mockElementRect(slot, {top: 100, height: slotHeight});
+      const data = createDragData();
+      writeCalendarDragPayload(data, {type: 'calendar-task', taskId: 1, source: 'sidebar'});
+
+      const dropEvent = createEvent.drop(slot, {dataTransfer: data});
+      Object.defineProperty(dropEvent, 'clientY', {value: 100 + slotHeight / 2});
+      fireEvent(slot, dropEvent);
+
+      expect(onScheduleTime).toHaveBeenCalledWith({taskId: 1, date: '2026-06-06', hour: 9, minute: 30});
+    });
+  }
+
   it('uses density height when converting a quick-create pointer offset', () => {
     const onOpenQuickCreate = vi.fn();
     renderWeek({enableQuickCreate: true, weekTimelineDensity: 'comfortable', onOpenQuickCreate});
@@ -318,6 +338,122 @@ describe('WeekTimelineView', () => {
       startAt: '2026-06-06T09:30:00.000',
       endAt: '2026-06-06T10:30:00.000',
     }));
+  });
+
+  it('creates the default timed draft for below-threshold same-slot pointer movement', () => {
+    const onOpenQuickCreate = vi.fn();
+    renderWeek({enableQuickCreate: true, onOpenQuickCreate});
+    const slot = screen.getByLabelText('2026-06-06 09:00');
+    mockElementRect(slot, {top: 100, height: 64});
+
+    act(() => {
+      dispatchElementPointerDown(slot, 100, 20);
+      dispatchElementPointerUp(slot, 103, 20);
+    });
+
+    expect(onOpenQuickCreate).toHaveBeenCalledWith(expect.objectContaining({
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T10:00:00.000',
+    }));
+  });
+
+  it('creates a minimum-duration timed draft for above-threshold same-slot pointer movement', () => {
+    const onOpenQuickCreate = vi.fn();
+    renderWeek({enableQuickCreate: true, onOpenQuickCreate});
+    const slot = screen.getByLabelText('2026-06-06 09:00');
+    mockElementRect(slot, {top: 100, height: 64});
+
+    act(() => {
+      dispatchElementPointerDown(slot, 100, 20);
+      dispatchElementPointerUp(slot, 110, 20);
+    });
+
+    expect(onOpenQuickCreate).toHaveBeenCalledWith(expect.objectContaining({
+      startAt: '2026-06-06T09:00:00.000',
+      endAt: '2026-06-06T09:15:00.000',
+    }));
+  });
+
+  it('does not open quick create when a time-slot drop payload lands after quick-create was armed', () => {
+    const onOpenQuickCreate = vi.fn();
+    const onScheduleTime = vi.fn().mockResolvedValue(true);
+    renderWeek({enableQuickCreate: true, onOpenQuickCreate, onScheduleTime});
+    const slot = screen.getByLabelText('2026-06-06 09:00');
+    mockElementRect(slot, {top: 100, height: 64});
+    const data = createDragData();
+    writeCalendarDragPayload(data, {type: 'calendar-task', taskId: 1, source: 'sidebar'});
+
+    act(() => {
+      dispatchElementPointerDown(slot, 100, 20);
+    });
+    const dropEvent = createEvent.drop(slot, {dataTransfer: data});
+    Object.defineProperty(dropEvent, 'clientY', {value: 132});
+    fireEvent(slot, dropEvent);
+    act(() => {
+      dispatchElementPointerUp(slot, 100, 20);
+    });
+
+    expect(onScheduleTime).toHaveBeenCalledWith({taskId: 1, date: '2026-06-06', hour: 9, minute: 30});
+    expect(onOpenQuickCreate).not.toHaveBeenCalled();
+  });
+
+  it('uses non-standard density when moving an existing timed task and preserves duration', () => {
+    const onMoveTimedTask = vi.fn().mockResolvedValue(true);
+    renderWeek({
+      weekTimelineDensity: 'comfortable',
+      onMoveTimedTask,
+      tasksByDate: {
+        '2026-06-06': [{
+          ...task,
+          id: 2,
+          title: '时间段任务',
+          plannedDate: '2026-06-06',
+          allDay: false,
+          startAt: '2026-06-06T09:15:00.000',
+          endAt: '2026-06-06T10:30:00.000',
+        }],
+      },
+    });
+
+    const data = createDragData();
+    fireEvent.dragStart(screen.getByLabelText('2026-06-06 09:15-10:30 时间段任务'), {dataTransfer: data});
+    const dropSlot = screen.getByLabelText('2026-06-04 13:00');
+    mockElementRect(dropSlot, {top: 200, height: 88});
+    const dropEvent = createEvent.drop(dropSlot, {dataTransfer: data});
+    Object.defineProperty(dropEvent, 'clientY', {value: 266});
+    fireEvent(dropSlot, dropEvent);
+
+    expect(onMoveTimedTask).toHaveBeenCalledWith({
+      taskId: 2,
+      date: '2026-06-04',
+      hour: 13,
+      minute: 45,
+      durationMinutes: 75,
+    });
+  });
+
+  it('positions timed task blocks from their wall-clock range', () => {
+    renderWeek({
+      weekTimelineDensity: 'comfortable',
+      tasksByDate: {
+        '2026-06-06': [{
+          ...task,
+          id: 2,
+          title: '时间段任务',
+          plannedDate: '2026-06-06',
+          allDay: false,
+          startAt: '2026-06-06T09:15:00.000',
+          endAt: '2026-06-06T10:30:00.000',
+        }],
+      },
+    });
+
+    expect(screen.getByLabelText('2026-06-06 09:00')).toHaveStyle({height: '88px'});
+    expect(screen.getByLabelText('2026-06-06 09:15-10:30 时间段任务')).toHaveStyle({
+      top: '38.54166666666667%',
+      height: '5.208333333333334%',
+      minHeight: '24px',
+    });
   });
 
   it('uses density height when converting resize pointer movement', () => {
@@ -351,6 +487,42 @@ describe('WeekTimelineView', () => {
       startAt: '2026-06-06T09:00:00.000',
       durationMinutes: 90,
     }));
+  });
+
+  it('resizes from the handle pointer flow without opening quick create', () => {
+    const onResizeTimedTask = vi.fn().mockResolvedValue(true);
+    const onOpenQuickCreate = vi.fn();
+    renderWeek({
+      enableQuickCreate: true,
+      onOpenQuickCreate,
+      onResizeTimedTask,
+      tasksByDate: {
+        '2026-06-06': [{
+          ...task,
+          id: 2,
+          title: '时间段任务',
+          plannedDate: '2026-06-06',
+          allDay: false,
+          startAt: '2026-06-06T09:00:00.000',
+          endAt: '2026-06-06T10:00:00.000',
+        }],
+      },
+    });
+
+    act(() => {
+      dispatchElementPointerDown(screen.getByLabelText('调整时间段任务时长'), 100);
+    });
+    act(() => {
+      dispatchWindowPointerUp(116);
+    });
+
+    expect(onResizeTimedTask).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 2,
+      plannedDate: '2026-06-06',
+      startAt: '2026-06-06T09:00:00.000',
+      durationMinutes: 75,
+    }));
+    expect(onOpenQuickCreate).not.toHaveBeenCalled();
   });
 
   it('clears resize state on pointer cancel without resizing', () => {
@@ -499,6 +671,73 @@ describe('WeekTimelineView', () => {
     expect(secondSegment).toHaveStyle({gridColumn: '5 / span 3', gridRow: '2'});
     expect(screen.getAllByText(/跨天任务 [AB]/)).toHaveLength(2);
     expect(screen.getByLabelText('2026-06-04 全天')).toHaveStyle({minHeight: '100px'});
+  });
+
+  it('clips all-day tasks that start before the visible week and exposes previous continuation', () => {
+    renderWeek({
+      tasksByDate: {
+        '2026-06-01': [{
+          ...task,
+          id: 2,
+          title: '上周延续',
+          plannedDate: '2026-05-30',
+          plannedEndDate: '2026-06-03',
+        }],
+      },
+    });
+
+    const segment = screen.getByLabelText(/2026-06-01 至 2026-06-03 上周延续/);
+    expect(segment).toHaveStyle({gridColumn: '2 / span 3'});
+    expect(segment).toHaveAttribute('data-visible-start', '2026-06-01');
+    expect(segment).toHaveAttribute('data-visible-end', '2026-06-03');
+    expect(segment).toHaveAttribute('data-continues-before', 'true');
+    expect(segment).toHaveAttribute('data-continues-after', 'false');
+    expect(segment).toHaveAccessibleName(/从本周前开始/);
+  });
+
+  it('clips all-day tasks that continue after the visible week and exposes next continuation', () => {
+    renderWeek({
+      tasksByDate: {
+        '2026-06-05': [{
+          ...task,
+          id: 2,
+          title: '下周继续',
+          plannedDate: '2026-06-05',
+          plannedEndDate: '2026-06-10',
+        }],
+      },
+    });
+
+    const segment = screen.getByLabelText(/2026-06-05 至 2026-06-07 下周继续/);
+    expect(segment).toHaveStyle({gridColumn: '6 / span 3'});
+    expect(segment).toHaveAttribute('data-visible-start', '2026-06-05');
+    expect(segment).toHaveAttribute('data-visible-end', '2026-06-07');
+    expect(segment).toHaveAttribute('data-continues-before', 'false');
+    expect(segment).toHaveAttribute('data-continues-after', 'true');
+    expect(segment).toHaveAccessibleName(/持续到本周后/);
+  });
+
+  it('clips all-day tasks spanning both sides of the visible week and exposes both continuations', () => {
+    renderWeek({
+      tasksByDate: {
+        '2026-06-01': [{
+          ...task,
+          id: 2,
+          title: '整周跨越',
+          plannedDate: '2026-05-28',
+          plannedEndDate: '2026-06-12',
+        }],
+      },
+    });
+
+    const segment = screen.getByLabelText(/2026-06-01 至 2026-06-07 整周跨越/);
+    expect(segment).toHaveStyle({gridColumn: '2 / span 7'});
+    expect(segment).toHaveAttribute('data-visible-start', '2026-06-01');
+    expect(segment).toHaveAttribute('data-visible-end', '2026-06-07');
+    expect(segment).toHaveAttribute('data-continues-before', 'true');
+    expect(segment).toHaveAttribute('data-continues-after', 'true');
+    expect(segment).toHaveAccessibleName(/从本周前开始/);
+    expect(segment).toHaveAccessibleName(/持续到本周后/);
   });
 
   it('writes calendar drag payloads from all-day segments', () => {
