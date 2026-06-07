@@ -1,5 +1,5 @@
 import type {Category, DailyReport, Task, TaskExecutionSession, WeeklyReview} from '../../../../shared/domain/entities';
-import type {ReportGeneratorType, SessionStatus, TaskStatus} from '../../../../shared/domain/status';
+import type {ReportGeneratorType, SessionStatus, TaskPriority, TaskStatus} from '../../../../shared/domain/status';
 
 export interface CategoryRow {
   id: number;
@@ -21,6 +21,7 @@ export interface TaskRow {
   start_at?: string | null;
   end_at?: string | null;
   all_day?: number;
+  priority: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -73,7 +74,13 @@ export function mapCategoryRow(row: CategoryRow): Category {
   };
 }
 
-export function mapTaskRow(row: TaskRow): Task {
+export function mapTaskRow(row: TaskRow, tagIdsOrIndex: number[] | number = []): Task {
+  const tagIds = Array.isArray(tagIdsOrIndex) ? tagIdsOrIndex : [];
+  const metadata = {
+    priority: row.priority as TaskPriority | null,
+    tagIds,
+  };
+
   if (!row.planned_date) {
     return {
       id: row.id,
@@ -88,6 +95,7 @@ export function mapTaskRow(row: TaskRow): Task {
       status: row.status as TaskStatus,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      ...metadata,
     };
   }
 
@@ -106,6 +114,7 @@ export function mapTaskRow(row: TaskRow): Task {
     status: row.status as TaskStatus,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    ...metadata,
   };
 }
 

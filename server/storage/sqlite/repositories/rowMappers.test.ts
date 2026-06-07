@@ -41,11 +41,12 @@ describe('sqlite row mappers', () => {
         start_at: null,
         end_at: null,
         all_day: 1,
+        priority: null,
         status: 'TODO',
         created_at: '2026-06-05T00:00:00.000Z',
         updated_at: '2026-06-05T00:00:00.000Z',
       }),
-    ).toMatchObject({categoryId: 1, allDay: true});
+    ).toMatchObject({categoryId: 1, allDay: true, priority: null, tagIds: []});
 
     expect(
       mapSessionRow({
@@ -104,6 +105,7 @@ describe('sqlite row mappers', () => {
       start_at: '2026-06-06T09:00:00.000',
       end_at: '2026-06-06T10:00:00.000',
       all_day: 0,
+      priority: null,
       status: 'TODO',
       created_at: '2026-06-05T00:00:00.000Z',
       updated_at: '2026-06-05T00:00:00.000Z',
@@ -113,6 +115,29 @@ describe('sqlite row mappers', () => {
       startAt: undefined,
       endAt: undefined,
       allDay: true,
+      priority: null,
+      tagIds: [],
+    });
+  });
+
+  it('maps task tag ids in requested order', () => {
+    expect(mapTaskRow({
+      id: 7,
+      user_id: 1,
+      category_id: 1,
+      title: '带标签',
+      planned_date: null,
+      planned_end_date: null,
+      start_at: null,
+      end_at: null,
+      all_day: 1,
+      priority: 'P1',
+      status: 'TODO',
+      created_at: '2026-06-05T00:00:00.000Z',
+      updated_at: '2026-06-05T00:00:00.000Z',
+    }, [3, 1])).toMatchObject({
+      priority: 'P1',
+      tagIds: [3, 1],
     });
   });
 });

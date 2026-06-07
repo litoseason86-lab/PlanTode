@@ -160,6 +160,7 @@ const migrations: Migration[] = [
           create index if not exists idx_tasks_user_category on tasks(user_id, category_id);
           create index if not exists idx_tasks_user_planned_end_date on tasks(user_id, planned_end_date);
           create index if not exists idx_tasks_user_start_at on tasks(user_id, start_at);
+          create unique index if not exists idx_tasks_id_user on tasks(id, user_id);
         `);
         const violations = db.pragma('foreign_key_check') as unknown[];
         if (violations.length > 0) {
@@ -172,6 +173,48 @@ const migrations: Migration[] = [
       } finally {
         db.pragma('foreign_keys = ON');
       }
+    },
+  },
+  {
+    version: 5,
+    name: 'task_tags_priority',
+    apply(db) {
+      const taskColumns = db.prepare('pragma table_info(tasks)').all() as Array<{name: string}>;
+      if (!taskColumns.some((column) => column.name === 'priority')) {
+        db.exec("alter table tasks add column priority text check (priority in ('P1', 'P2', 'P3', 'P4') or priority is null)");
+      }
+
+      db.exec(`
+        create table if not exists tags (
+          id integer primary key,
+          user_id integer not null,
+          name text not null,
+          normalized_name text not null,
+          created_at text not null,
+          updated_at text not null,
+          foreign key (user_id) references users(id),
+          unique(user_id, normalized_name)
+        );
+
+        create unique index if not exists idx_tasks_id_user on tasks(id, user_id);
+        create unique index if not exists idx_tags_id_user on tags(id, user_id);
+
+        create table if not exists task_tags (
+          task_id integer not null,
+          tag_id integer not null,
+          user_id integer not null,
+          created_at text not null,
+          foreign key (task_id, user_id) references tasks(id, user_id),
+          foreign key (tag_id, user_id) references tags(id, user_id),
+          foreign key (user_id) references users(id),
+          unique(user_id, task_id, tag_id)
+        );
+
+        create index if not exists idx_tasks_user_priority on tasks(user_id, priority);
+        create index if not exists idx_tags_user_name on tags(user_id, name);
+        create index if not exists idx_task_tags_user_tag on task_tags(user_id, tag_id);
+        create index if not exists idx_task_tags_user_task on task_tags(user_id, task_id);
+      `);
     },
   },
 ];

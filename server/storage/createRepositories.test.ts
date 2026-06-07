@@ -43,6 +43,7 @@ describe('createRepositoriesFromEnv', () => {
     const repositories = createRepositoriesFromEnv();
 
     expect(repositories.categories.constructor.name).toBe('CategorySqliteRepository');
+    expect(repositories.tags.constructor.name).toBe('TagSqliteRepository');
     expect(repositories.tasks.constructor.name).toBe('TaskSqliteRepository');
     expect(repositories.focusSessions.constructor.name).toBe('FocusSessionSqliteRepository');
     expect(repositories.reports.constructor.name).toBe('ReportSqliteRepository');
@@ -56,6 +57,7 @@ describe('createRepositoriesFromEnv', () => {
     const repositories = createRepositoriesFromEnv();
 
     expect(repositories.categories.constructor.name).toBe('CategorySqliteRepository');
+    expect(repositories.tags.constructor.name).toBe('TagSqliteRepository');
     expect(repositories.tasks.constructor.name).toBe('TaskSqliteRepository');
     expect(repositories.focusSessions.constructor.name).toBe('FocusSessionSqliteRepository');
     expect(repositories.reports.constructor.name).toBe('ReportSqliteRepository');
@@ -89,6 +91,7 @@ describe('createRepositoriesFromEnv', () => {
     const repositories = createRepositoriesFromEnv();
 
     expect(repositories.categories.constructor.name).toBe('CategoryJsonRepository');
+    expect(repositories.tags.constructor.name).toBe('TagJsonRepository');
     expect(repositories.tasks.constructor.name).toBe('TaskJsonRepository');
     expect(repositories.focusSessions.constructor.name).toBe('FocusSessionJsonRepository');
     expect(repositories.reports.constructor.name).toBe('ReportJsonRepository');
