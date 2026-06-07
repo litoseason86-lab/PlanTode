@@ -48,6 +48,10 @@ function dispatchWindowPointerUp(clientY: number) {
   window.dispatchEvent(new MouseEvent('pointerup', {bubbles: true, clientY}));
 }
 
+function dispatchWindowPointerCancel(clientY = 0) {
+  window.dispatchEvent(new MouseEvent('pointercancel', {bubbles: true, clientY}));
+}
+
 function dispatchElementPointerDown(element: Element, clientY: number, clientX = 0) {
   element.dispatchEvent(new MouseEvent('pointerdown', {bubbles: true, clientX, clientY}));
 }
@@ -188,6 +192,35 @@ describe('WeekTimelineView', () => {
     expect(onOpenQuickCreate).not.toHaveBeenCalled();
   });
 
+  it('clears a timed quick-create pointer after window pointerup', () => {
+    const onOpenQuickCreate = vi.fn();
+    renderWeek({enableQuickCreate: true, onOpenQuickCreate});
+    const slot = screen.getByLabelText('2026-06-06 09:00');
+    mockElementRect(slot, {top: 100, height: 64});
+
+    act(() => {
+      dispatchElementPointerDown(slot, 100, 20);
+      dispatchWindowPointerUp(100);
+      dispatchElementPointerUp(slot, 100, 20);
+    });
+
+    expect(onOpenQuickCreate).not.toHaveBeenCalled();
+  });
+
+  it('clears an all-day quick-create pointer after window pointerup', () => {
+    const onOpenQuickCreate = vi.fn();
+    renderWeek({enableQuickCreate: true, onOpenQuickCreate});
+    const allDayLane = screen.getByLabelText('2026-06-06 全天');
+
+    act(() => {
+      dispatchElementPointerDown(allDayLane, 20, 10);
+      dispatchWindowPointerUp(20);
+      dispatchElementPointerUp(allDayLane, 20, 10);
+    });
+
+    expect(onOpenQuickCreate).not.toHaveBeenCalled();
+  });
+
   it('clears all quick-create pointers when dropping on a time slot', () => {
     const onOpenQuickCreate = vi.fn();
     const onScheduleTime = vi.fn().mockResolvedValue(true);
@@ -267,6 +300,34 @@ describe('WeekTimelineView', () => {
     }));
   });
 
+  it('clears resize state on pointer cancel without resizing', () => {
+    const onResizeTimedTask = vi.fn().mockResolvedValue(true);
+    renderWeek({
+      onResizeTimedTask,
+      tasksByDate: {
+        '2026-06-06': [{
+          ...task,
+          id: 2,
+          title: '时间段任务',
+          plannedDate: '2026-06-06',
+          allDay: false,
+          startAt: '2026-06-06T09:00:00.000',
+          endAt: '2026-06-06T10:00:00.000',
+        }],
+      },
+    });
+
+    act(() => {
+      dispatchElementPointerDown(screen.getByLabelText('调整时间段任务时长'), 100);
+    });
+    act(() => {
+      dispatchWindowPointerCancel(100);
+      dispatchWindowPointerUp(144);
+    });
+
+    expect(onResizeTimedTask).not.toHaveBeenCalled();
+  });
+
   it('hides resize handle when a timed task cannot end 15 minutes later on the same day', () => {
     renderWeek({
       tasksByDate: {
@@ -283,6 +344,24 @@ describe('WeekTimelineView', () => {
     });
 
     expect(screen.queryByLabelText('调整临界时间任务时长')).not.toBeInTheDocument();
+  });
+
+  it('hides resize handle for cross-day timed tasks', () => {
+    renderWeek({
+      tasksByDate: {
+        '2026-06-06': [{
+          ...task,
+          id: 2,
+          title: '跨天时间段任务',
+          plannedDate: '2026-06-06',
+          allDay: false,
+          startAt: '2026-06-06T23:00:00.000',
+          endAt: '2026-06-07T02:00:00.000',
+        }],
+      },
+    });
+
+    expect(screen.queryByLabelText('调整跨天时间段任务时长')).not.toBeInTheDocument();
   });
 
   it('renders duplicated cross-day all-day tasks as one continuous segment', () => {

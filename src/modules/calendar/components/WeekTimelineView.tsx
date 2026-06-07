@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent} from 'react';
+import {useCallback, useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent} from 'react';
 
 import type {Category, Task, TaskExecutionSession} from '../../../../shared/domain/entities';
 import {toIsoDate} from '../../../../shared/lib/date';
@@ -80,6 +80,10 @@ function taskDurationMinutes(task: Task): number | undefined {
     return undefined;
   }
   return timedTaskDurationMinutes({startAt: task.startAt, endAt: task.endAt});
+}
+
+function isSameDayTimedTask(task: {startAt: string; endAt: string}): boolean {
+  return task.startAt.slice(0, 10) === task.endAt.slice(0, 10);
 }
 
 function formatTimelineClock(minutes: number): string {
@@ -215,10 +219,10 @@ export function WeekTimelineView({
   const timeQuickCreatePointerRef = useRef<TimeQuickCreatePointerState | null>(null);
   const allDayQuickCreatePointerRef = useRef<AllDayQuickCreatePointerState | null>(null);
 
-  const clearQuickCreatePointers = () => {
+  const clearQuickCreatePointers = useCallback(() => {
     timeQuickCreatePointerRef.current = null;
     allDayQuickCreatePointerRef.current = null;
-  };
+  }, []);
 
   const handleAllDayDrop = (event: DragEvent<HTMLElement>, date: string) => {
     event.preventDefault();
@@ -313,11 +317,28 @@ export function WeekTimelineView({
   };
 
   useEffect(() => {
+    window.addEventListener('pointerup', clearQuickCreatePointers);
+    window.addEventListener('pointercancel', clearQuickCreatePointers);
+    window.addEventListener('blur', clearQuickCreatePointers);
+
+    return () => {
+      window.removeEventListener('pointerup', clearQuickCreatePointers);
+      window.removeEventListener('pointercancel', clearQuickCreatePointers);
+      window.removeEventListener('blur', clearQuickCreatePointers);
+    };
+  }, [clearQuickCreatePointers]);
+
+  useEffect(() => {
     if (!resizeState) {
       return undefined;
     }
 
+    let cancelled = false;
     const onPointerUp = (event: PointerEvent) => {
+      if (cancelled) {
+        setResizeState(null);
+        return;
+      }
       const durationMinutes = getResizeDurationMinutes({
         initialDurationMinutes: resizeState.initialDurationMinutes,
         startY: resizeState.startY,
@@ -332,11 +353,19 @@ export function WeekTimelineView({
       });
       setResizeState(null);
     };
+    const clearResizeState = () => {
+      cancelled = true;
+      setResizeState(null);
+    };
 
     window.addEventListener('pointerup', onPointerUp, {once: true});
+    window.addEventListener('pointercancel', clearResizeState);
+    window.addEventListener('blur', clearResizeState);
 
     return () => {
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', clearResizeState);
+      window.removeEventListener('blur', clearResizeState);
     };
   }, [hourHeight, onResizeTimedTask, resizeState]);
 
@@ -521,7 +550,7 @@ export function WeekTimelineView({
                           专注 {taskFocusMinutes}m
                         </div>
                       )}
-                      {segment.isLastSegment && canResizeTimedTask(task.startAt) && (
+                      {segment.isLastSegment && isSameDayTimedTask(task) && canResizeTimedTask(task.startAt) && (
                         <button
                           type="button"
                           aria-label={`调整${task.title}时长`}
