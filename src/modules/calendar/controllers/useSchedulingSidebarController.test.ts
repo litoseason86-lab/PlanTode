@@ -112,6 +112,28 @@ describe('useSchedulingSidebarController', () => {
     expect(result.current.selectedTaskIds.has(1)).toBe(true);
   });
 
+  it('batch unschedules unique selected ids, clears selection, and refreshes after success', async () => {
+    vi.mocked(calendarApi.getUnscheduledTasks).mockResolvedValue([
+      {id: 2, title: '未安排二'},
+      {id: 1, title: '未安排一'},
+    ] as never);
+    vi.mocked(calendarApi.getAllDayWithoutTimeTasks).mockResolvedValue([{id: 2, title: '重复'}] as never);
+    const batchUnschedule = vi.fn().mockResolvedValue(true);
+    const {result} = renderHook(() => useSchedulingSidebarController(baseArgs({batchUnschedule})));
+
+    await waitFor(() => expect(result.current.tasks.map((task) => task.id)).toEqual([2, 1]));
+
+    act(() => result.current.selectAllVisible());
+    expect(result.current.selectedTaskIds.size).toBe(2);
+
+    await act(async () => result.current.batchUnscheduleSelected());
+
+    expect(batchUnschedule).toHaveBeenCalledWith({taskIds: [1, 2]});
+    expect(result.current.selectedTaskIds.size).toBe(0);
+    expect(calendarApi.getUnscheduledTasks).toHaveBeenCalledTimes(2);
+    expect(calendarApi.getAllDayWithoutTimeTasks).toHaveBeenCalledTimes(2);
+  });
+
   it('resets the selected schedule date to the new range start when the selected date leaves the range', async () => {
     vi.mocked(calendarApi.getUnscheduledTasks).mockResolvedValue([]);
     vi.mocked(calendarApi.getAllDayWithoutTimeTasks).mockResolvedValue([]);

@@ -68,6 +68,15 @@ describe('SchedulingSidebar', () => {
     expect(controller.batchScheduleSelected).toHaveBeenCalledWith('2026-06-08');
   });
 
+  it('unschedules selected tasks through the cancel arrangement button', () => {
+    const controller = controllerWithTasks([unscheduledTask, dateTask], new Set([1, 2]));
+    render(<SchedulingSidebar controller={controller} categories={categories} tags={tags} />);
+
+    fireEvent.click(screen.getByRole('button', {name: '取消安排'}));
+
+    expect(controller.batchUnscheduleSelected).toHaveBeenCalledOnce();
+  });
+
   it('writes a batch payload only when dragging a selected row with multiple selections', () => {
     const controller = controllerWithTasks([unscheduledTask, dateTask], new Set([1, 2]));
     const data = createDragData();

@@ -835,6 +835,70 @@ describe('CalendarPanel', () => {
     expect(screen.getByLabelText('任务标题')).toHaveValue('保留输入');
   });
 
+  it('shows week density controls only while the week view is active', () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    renderCalendarPanel();
+
+    expect(screen.getByRole('group', {name: '周视图密度'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: '紧凑'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: '标准'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: '宽松'})).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: '月'}));
+
+    expect(screen.queryByRole('group', {name: '周视图密度'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '宽松'})).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: '列表'}));
+
+    expect(screen.queryByRole('group', {name: '周视图密度'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: '宽松'})).not.toBeInTheDocument();
+  });
+
+  it('preserves comfortable week density after switching away and back to week view', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    renderCalendarPanel();
+
+    fireEvent.click(await screen.findByRole('button', {name: '宽松'}));
+
+    expect(screen.getByLabelText('2026-06-06 09:00')).toHaveStyle({height: '88px'});
+
+    fireEvent.click(screen.getByRole('button', {name: '月'}));
+    expect(screen.queryByRole('group', {name: '周视图密度'})).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: '周'}));
+
+    expect(screen.getByRole('button', {name: '宽松'})).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('2026-06-06 09:00')).toHaveStyle({height: '88px'});
+  });
+
+  it('restores week density from the calendar settings key on remount without adding storage keys', () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    localStorage.setItem(CALENDAR_SETTINGS_STORAGE_KEY, JSON.stringify({
+      visibleCategoryIds: [],
+      showCompleted: true,
+      colorMode: 'category',
+      showFocusSessions: true,
+      weekTimelineDensity: 'comfortable',
+    }));
+
+    const {unmount} = renderCalendarPanel();
+
+    expect(screen.getByRole('button', {name: '宽松'})).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('2026-06-06 09:00')).toHaveStyle({height: '88px'});
+
+    unmount();
+    renderCalendarPanel();
+
+    expect(screen.getByRole('button', {name: '宽松'})).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('2026-06-06 09:00')).toHaveStyle({height: '88px'});
+    expect(localStorage.length).toBe(1);
+    expect(localStorage.key(0)).toBe(CALENDAR_SETTINGS_STORAGE_KEY);
+  });
+
   it('changes week timeline density from toolbar', async () => {
     vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
     vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
