@@ -10,7 +10,11 @@ import {
   saveCalendarSettings,
   type CalendarSettings,
 } from './calendarSettings';
-import type {CalendarQuickCreateDraft, WeekTimelineDensity} from './weekTimelineInteraction';
+import {
+  validateTimedRangeWithinBounds,
+  type CalendarQuickCreateDraft,
+  type WeekTimelineDensity,
+} from './weekTimelineInteraction';
 import {useTaskSchedulingActions} from './useTaskSchedulingActions';
 
 interface UseCalendarControllerArgs {
@@ -20,6 +24,20 @@ interface UseCalendarControllerArgs {
   onMutationSuccess?: () => Promise<void> | void;
 }
 
+interface CalendarTaskEditorState {
+  task: Task;
+  anchor: {x: number; y: number};
+}
+
+interface SubmitTaskEditorInput {
+  title: string;
+  categoryId: number;
+  startAt: string;
+  endAt: string;
+}
+
+type CalendarMutationResult = {ok: true} | {ok: false; message: string};
+
 export function useCalendarController({categories, initialDate, showToast, onMutationSuccess}: UseCalendarControllerArgs) {
   const showToastRef = useRef(showToast);
   const refreshSeqRef = useRef(0);
@@ -28,6 +46,7 @@ export function useCalendarController({categories, initialDate, showToast, onMut
   const [anchorDate, setAnchorDate] = useState(() => initialDate ?? toIsoDate(new Date()));
   const [settings, setSettingsState] = useState<CalendarSettings>(() => loadCalendarSettings());
   const [quickCreateDraft, setQuickCreateDraft] = useState<CalendarQuickCreateDraft | undefined>();
+  const [taskEditor, setTaskEditor] = useState<CalendarTaskEditorState | undefined>();
   const [rawTasks, setRawTasks] = useState<Task[]>([]);
   const [focusSessions, setFocusSessions] = useState<TaskExecutionSession[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +73,14 @@ export function useCalendarController({categories, initialDate, showToast, onMut
   function closeQuickCreateDraft(): void {
     quickCreateDraftSeqRef.current += 1;
     setQuickCreateDraft(undefined);
+  }
+
+  function openTaskEditor(input: CalendarTaskEditorState): void {
+    setTaskEditor(input);
+  }
+
+  function closeTaskEditor(): void {
+    setTaskEditor(undefined);
   }
 
   function setWeekTimelineDensity(density: WeekTimelineDensity): void {
@@ -206,6 +233,110 @@ export function useCalendarController({categories, initialDate, showToast, onMut
     return {ok: true};
   }
 
+  async function refreshAfterEditorFailure() {
+    try {
+      await refreshCalendarData();
+    } catch (error) {
+      showToastRef.current(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+    }
+  }
+
+  async function submitTaskEditor(input: SubmitTaskEditorInput): Promise<CalendarMutationResult> {
+    if (!taskEditor) {
+      return {ok: false, message: '没有可编辑的任务'};
+    }
+
+    const title = input.title.trim();
+    if (!title) {
+      return {ok: false, message: '请输入任务标题'};
+    }
+
+    const task = taskEditor.task;
+    const plannedDate = task.plannedDate ?? input.startAt.slice(0, 10);
+    if (input.startAt.slice(0, 10) !== plannedDate || input.endAt.slice(0, 10) !== plannedDate) {
+      return {ok: false, message: '只能在 00:00-23:59 内调整'};
+    }
+
+    const validation = validateTimedRangeWithinBounds({
+      startAt: input.startAt,
+      endAt: input.endAt,
+      editableStartAt: `${plannedDate}T00:00:00.000`,
+      editableEndAt: `${plannedDate}T23:59:00.000`,
+    });
+    if (!validation.ok) {
+      return validation;
+    }
+
+    const scheduleChanged = task.startAt !== input.startAt || task.endAt !== input.endAt;
+    const detailsChanged = task.title !== title || task.categoryId !== input.categoryId;
+
+    try {
+      if (scheduleChanged) {
+        await calendarApi.updateTaskSchedule(task.id, {
+          plannedDate,
+          plannedEndDate: undefined,
+          startAt: input.startAt,
+          endAt: input.endAt,
+          allDay: false,
+        });
+      }
+
+      if (detailsChanged) {
+        await calendarApi.updateTaskDetails(task.id, {
+          title,
+          categoryId: input.categoryId,
+          priority: task.priority,
+          tagIds: task.tagIds,
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '任务保存失败';
+      showToastRef.current(message, 'error');
+      await refreshAfterEditorFailure();
+      return {ok: false, message};
+    }
+
+    setTaskEditor(undefined);
+    try {
+      await refreshCalendarData();
+    } catch (error) {
+      showToastRef.current(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+    }
+    try {
+      await onMutationSuccess?.();
+    } catch (error) {
+      showToastRef.current(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+    }
+    return {ok: true};
+  }
+
+  async function deleteTaskFromEditor(): Promise<CalendarMutationResult> {
+    if (!taskEditor) {
+      return {ok: false, message: '没有可删除的任务'};
+    }
+
+    try {
+      await calendarApi.deleteTask(taskEditor.task.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '任务删除失败';
+      showToastRef.current(message, 'error');
+      return {ok: false, message};
+    }
+
+    setTaskEditor(undefined);
+    try {
+      await refreshCalendarData();
+    } catch (error) {
+      showToastRef.current(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+    }
+    try {
+      await onMutationSuccess?.();
+    } catch (error) {
+      showToastRef.current(error instanceof Error ? error.message : '日历数据刷新失败', 'error');
+    }
+    return {ok: true};
+  }
+
   return {
     view,
     setView,
@@ -219,6 +350,11 @@ export function useCalendarController({categories, initialDate, showToast, onMut
     openQuickCreateDraft,
     closeQuickCreateDraft,
     submitQuickCreateDraft,
+    taskEditor,
+    openTaskEditor,
+    closeTaskEditor,
+    submitTaskEditor,
+    deleteTaskFromEditor,
     categories,
     rawTasks,
     tasks,

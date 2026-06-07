@@ -1,6 +1,7 @@
 import {act, renderHook, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
+import type {Task} from '../../../../shared/domain/entities';
 import {calendarApi} from '../api/calendarApi';
 import type {CalendarQuickCreateDraft} from './weekTimelineInteraction';
 import {useCalendarController} from './useCalendarController';
@@ -12,7 +13,9 @@ vi.mock('../api/calendarApi', () => ({
     getUnscheduledTasks: vi.fn(),
     getAllDayWithoutTimeTasks: vi.fn(),
     createCalendarTask: vi.fn(),
+    updateTaskDetails: vi.fn(),
     updateTaskSchedule: vi.fn(),
+    deleteTask: vi.fn(),
     batchScheduleDate: vi.fn(),
     batchUnschedule: vi.fn(),
   },
@@ -30,6 +33,22 @@ function timedQuickCreateDraft(overrides: Partial<Extract<CalendarQuickCreateDra
     ...overrides,
   };
 }
+
+const editableTask: Task = {
+  id: 7,
+  userId: 1,
+  categoryId: 1,
+  title: '数学',
+  plannedDate: '2026-06-06',
+  startAt: '2026-06-06T13:00:00.000',
+  endAt: '2026-06-06T14:00:00.000',
+  allDay: false,
+  status: 'TODO',
+  priority: 'P1',
+  tagIds: [2, 3],
+  createdAt: '',
+  updatedAt: '',
+};
 
 describe('useCalendarController', () => {
   afterEach(() => {
@@ -604,6 +623,172 @@ describe('useCalendarController', () => {
 
     expect(result.current.quickCreateDraft).toBeUndefined();
     expect(showToast).toHaveBeenCalledWith('同步失败', 'error');
+  });
+
+  it('opens and closes the task editor state', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    const {result} = renderHook(() => useCalendarController({
+      categories: [],
+      initialDate: '2026-06-06',
+      showToast: vi.fn(),
+    }));
+
+    act(() => result.current.openTaskEditor({task: editableTask, anchor: {x: 10, y: 20}}));
+    expect(result.current.taskEditor).toEqual({task: editableTask, anchor: {x: 10, y: 20}});
+
+    act(() => result.current.closeTaskEditor());
+    expect(result.current.taskEditor).toBeUndefined();
+  });
+
+  it('saves task editor schedule then details while preserving metadata', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 7} as never);
+    vi.mocked(calendarApi.updateTaskDetails).mockResolvedValue({id: 7} as never);
+    const {result} = renderHook(() => useCalendarController({
+      categories: [],
+      initialDate: '2026-06-06',
+      showToast: vi.fn(),
+    }));
+
+    act(() => result.current.openTaskEditor({task: editableTask, anchor: {x: 10, y: 20}}));
+    await act(async () => {
+      await expect(result.current.submitTaskEditor({
+        title: '高数',
+        categoryId: 2,
+        startAt: '2026-06-06T13:15:00.000',
+        endAt: '2026-06-06T14:15:00.000',
+      })).resolves.toEqual({ok: true});
+    });
+
+    expect(calendarApi.updateTaskSchedule).toHaveBeenCalledWith(7, {
+      plannedDate: '2026-06-06',
+      plannedEndDate: undefined,
+      startAt: '2026-06-06T13:15:00.000',
+      endAt: '2026-06-06T14:15:00.000',
+      allDay: false,
+    });
+    expect(calendarApi.updateTaskDetails).toHaveBeenCalledWith(7, {
+      title: '高数',
+      categoryId: 2,
+      priority: 'P1',
+      tagIds: [2, 3],
+    });
+    expect(result.current.taskEditor).toBeUndefined();
+  });
+
+  it('uses only the schedule mutation when task editor only changes time', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.updateTaskSchedule).mockResolvedValue({id: 7} as never);
+    const {result} = renderHook(() => useCalendarController({
+      categories: [],
+      initialDate: '2026-06-06',
+      showToast: vi.fn(),
+    }));
+
+    act(() => result.current.openTaskEditor({task: editableTask, anchor: {x: 10, y: 20}}));
+    await act(async () => {
+      await result.current.submitTaskEditor({
+        title: '数学',
+        categoryId: 1,
+        startAt: '2026-06-06T13:15:00.000',
+        endAt: '2026-06-06T14:15:00.000',
+      });
+    });
+
+    expect(calendarApi.updateTaskSchedule).toHaveBeenCalledOnce();
+    expect(calendarApi.updateTaskDetails).not.toHaveBeenCalled();
+  });
+
+  it('uses only the details mutation when task editor only changes title or category', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.updateTaskDetails).mockResolvedValue({id: 7} as never);
+    const {result} = renderHook(() => useCalendarController({
+      categories: [],
+      initialDate: '2026-06-06',
+      showToast: vi.fn(),
+    }));
+
+    act(() => result.current.openTaskEditor({task: editableTask, anchor: {x: 10, y: 20}}));
+    await act(async () => {
+      await result.current.submitTaskEditor({
+        title: '高数',
+        categoryId: 2,
+        startAt: '2026-06-06T13:00:00.000',
+        endAt: '2026-06-06T14:00:00.000',
+      });
+    });
+
+    expect(calendarApi.updateTaskSchedule).not.toHaveBeenCalled();
+    expect(calendarApi.updateTaskDetails).toHaveBeenCalledOnce();
+  });
+
+  it('keeps task editor open and refreshes when editor save fails', async () => {
+    const showToast = vi.fn();
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.updateTaskSchedule).mockRejectedValue(new Error('保存失败'));
+    const {result} = renderHook(() => useCalendarController({
+      categories: [],
+      initialDate: '2026-06-06',
+      showToast,
+    }));
+
+    act(() => result.current.openTaskEditor({task: editableTask, anchor: {x: 10, y: 20}}));
+    await act(async () => {
+      await expect(result.current.submitTaskEditor({
+        title: '数学',
+        categoryId: 1,
+        startAt: '2026-06-06T13:15:00.000',
+        endAt: '2026-06-06T14:15:00.000',
+      })).resolves.toEqual({ok: false, message: '保存失败'});
+    });
+
+    expect(result.current.taskEditor).toEqual({task: editableTask, anchor: {x: 10, y: 20}});
+    expect(calendarApi.getCalendarTasks).toHaveBeenCalled();
+  });
+
+  it('deletes a task editor task then refreshes and closes', async () => {
+    const onMutationSuccess = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.deleteTask).mockResolvedValue(undefined);
+    const {result} = renderHook(() => useCalendarController({
+      categories: [],
+      initialDate: '2026-06-06',
+      showToast: vi.fn(),
+      onMutationSuccess,
+    }));
+
+    act(() => result.current.openTaskEditor({task: editableTask, anchor: {x: 10, y: 20}}));
+    await act(async () => {
+      await expect(result.current.deleteTaskFromEditor()).resolves.toEqual({ok: true});
+    });
+
+    expect(calendarApi.deleteTask).toHaveBeenCalledWith(7);
+    expect(onMutationSuccess).toHaveBeenCalledOnce();
+    expect(result.current.taskEditor).toBeUndefined();
+  });
+
+  it('keeps task editor open when delete fails', async () => {
+    vi.mocked(calendarApi.getCalendarTasks).mockResolvedValue([]);
+    vi.mocked(calendarApi.getFocusSessions).mockResolvedValue([]);
+    vi.mocked(calendarApi.deleteTask).mockRejectedValue(new Error('删除失败'));
+    const {result} = renderHook(() => useCalendarController({
+      categories: [],
+      initialDate: '2026-06-06',
+      showToast: vi.fn(),
+    }));
+
+    act(() => result.current.openTaskEditor({task: editableTask, anchor: {x: 10, y: 20}}));
+    await act(async () => {
+      await expect(result.current.deleteTaskFromEditor()).resolves.toEqual({ok: false, message: '删除失败'});
+    });
+
+    expect(result.current.taskEditor).toEqual({task: editableTask, anchor: {x: 10, y: 20}});
   });
 
   it('stores week timeline density through calendar settings', async () => {
